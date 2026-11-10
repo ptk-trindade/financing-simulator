@@ -1,4 +1,4 @@
-# Na Planta Flip Calculator
+# Financing Simulator
 
 Should you buy an off-plan apartment in São Paulo (imóvel na planta) and resell it when you get the keys, or keep the same money in fixed income? This calculator answers that month by month.
 
@@ -28,7 +28,7 @@ Open `index.html` in a browser. That's all.
 To change the code you need Node.js:
 
 ```sh
-npm run build   # rebuilds index.html and simulator/na-planta-flip.html from the sources
+npm run build   # rebuilds index.html and simulator/financing-simulator.html from the sources
 npm test        # runs the reference test cases against the calculation engine
 ```
 
@@ -39,7 +39,7 @@ npm test        # runs the reference test cases against the calculation engine
 - `simulator/build.mjs` inlines the engine into the template and writes the finished pages.
 - `simulator/test.mjs` runs the two reference cases and extra checks.
 - `index.html` is the built page that GitHub Pages serves. Don't edit it by hand; run `npm run build`.
-- `simulator/na-planta-flip.html` is the same page without the document wrapper, for hosting as a Claude artifact.
+- `simulator/financing-simulator.html` is the same page without the document wrapper, for hosting as a Claude artifact.
 
 ## Things to confirm before relying on it
 

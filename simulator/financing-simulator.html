@@ -1,4 +1,4 @@
-<title>Na Planta Flip Calculator</title>
+<title>Financing Simulator</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -944,14 +944,20 @@ td.neg { color: var(--ink-2); }
   'use strict'
   const E = window.OffplanEngine
   const D = E.DEFAULTS
-  const STORE_KEY = 'na-planta-flip:inputs:v1'
-  const OPEN_KEY = 'na-planta-flip:open:v1'
-  const LANG_KEY = 'na-planta-flip:lang:v1'
+  const STORE_KEY = 'financing-simulator:inputs:v1'
+  const OPEN_KEY = 'financing-simulator:open:v1'
+  const LANG_KEY = 'financing-simulator:lang:v1'
+  const OLD_PREFIX = 'na-planta-flip:' // keys used before the rename; read once so saved inputs carry over
   const $ = (s) => document.querySelector(s)
 
   // ---------- Storage ----------
   const store = {
-    get(key) { try { return JSON.parse(localStorage.getItem(key) || 'null') } catch (e) { return null } },
+    get(key) {
+      try {
+        const raw = localStorage.getItem(key) ?? localStorage.getItem(key.replace('financing-simulator:', OLD_PREFIX))
+        return JSON.parse(raw || 'null')
+      } catch (e) { return null }
+    },
     set(key, v) { try { localStorage.setItem(key, JSON.stringify(v)) } catch (e) { /* storage unavailable */ } },
   }
 
