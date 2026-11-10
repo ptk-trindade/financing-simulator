@@ -1403,7 +1403,7 @@ td.neg { color: var(--ink-2); }
       <div class="fields">
         <ul class="save-list" id="save-list"></ul>
         <form class="save-form" id="save-form" autocomplete="off">
-          <span class="inbox"><input id="save-name" class="text" maxlength="60" aria-label="${L('Name for a new simulation', 'Nome da nova simulação')}" placeholder="${L('New name, e.g. Pinheiros 2BR', 'Novo nome, ex.: Pinheiros 2 dorms')}"></span>
+          <span class="inbox"><input id="save-name" class="text" maxlength="60" aria-label="${L('Name for a new simulation', 'Nome da nova simulação')}" placeholder=""></span>
           <button type="submit" class="btn primary" id="save-btn"></button>
         </form>
         <span class="hint" id="save-hint"></span>
@@ -1451,10 +1451,17 @@ td.neg { color: var(--ink-2); }
     const input = $('#save-name')
     const btn = $('#save-btn')
     if (!input || !btn) return
-    const name = input.value.trim()
-    const taken = !!name && nameTaken(name)
-    btn.disabled = !name || taken
-    btn.textContent = taken ? L('Name in use', 'Nome já existe') : L('Save as new', 'Salvar como nova')
+    btn.textContent = L('Save as new', 'Salvar como nova')
+    input.placeholder = uniqueName(L('New simulation', 'Nova simulação'))
+  }
+
+  /** The name as typed (or "New simulation" when empty), with " (1)", " (2)"… added if it is taken. */
+  function uniqueName(typed) {
+    const base = typed.trim().slice(0, 55) || L('New simulation', 'Nova simulação')
+    if (!nameTaken(base)) return base
+    let n = 1
+    while (nameTaken(`${base} (${n})`)) n++
+    return `${base} (${n})`
   }
 
   function renderInputs() {
@@ -1606,9 +1613,7 @@ td.neg { color: var(--ink-2); }
     if (e.target.id !== 'save-form') return
     e.preventDefault()
     const input = $('#save-name')
-    const name = input.value.trim().slice(0, 60)
-    if (!name) return
-    if (nameTaken(name)) return
+    const name = uniqueName(input.value)
     const item = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, inputs: { ...state }, at: Date.now() }
     saves.list.push(item)
     if (saves.currentId) delete saves.pending[saves.currentId]
