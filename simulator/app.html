@@ -1,0 +1,1261 @@
+<title>Na Planta Flip Calculator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: inputs in a sticky left rail on wide screens; results first, inputs second on phones. */
+:root {
+  --bg: #f1f2f4;
+  --surface: #ffffff;
+  --surface-2: #f6f7f9;
+  --ink: #15181d;
+  --ink-2: #454b56;
+  --muted: #697080;
+  --line: #dde0e6;
+  --line-2: #c5cad3;
+  --buy: #2a78d6;
+  --buy-soft: #e5eefa;
+  --fi: #eb6834;
+  --fi-soft: #fdede4;
+  --good: #1d7a43;
+  --good-soft: #e3f2e8;
+  --warn: #935900;
+  --warn-soft: #fbefd9;
+  --bad: #b53131;
+  --bad-soft: #f8e3e3;
+  --font-display: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111317; --surface: #1a1d22; --surface-2: #20242a; --ink: #eceef1; --ink-2: #c4c8cf; --muted: #959ba6;
+    --line: #2c3139; --line-2: #3d434d; --buy: #3987e5; --buy-soft: #172539; --fi: #d95926; --fi-soft: #33200f;
+    --good: #5cc98a; --good-soft: #132a1d; --warn: #e3a646; --warn-soft: #32260e; --bad: #f07676; --bad-soft: #391818;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111317; --surface: #1a1d22; --surface-2: #20242a; --ink: #eceef1; --ink-2: #c4c8cf; --muted: #959ba6;
+  --line: #2c3139; --line-2: #3d434d; --buy: #3987e5; --buy-soft: #172539; --fi: #d95926; --fi-soft: #33200f;
+  --good: #5cc98a; --good-soft: #132a1d; --warn: #e3a646; --warn-soft: #32260e; --bad: #f07676; --bad-soft: #391818;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.5; }
+.page {
+  max-width: 1320px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 96px;
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.2; }
+h1 { font-size: clamp(1.35rem, 1rem + 1.4vw, 1.9rem); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.05rem; font-weight: 600; }
+p { margin: 0; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--buy); outline-offset: 2px; }
+.num, td, .v { font-variant-numeric: tabular-nums; }
+.eyebrow { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.muted { color: var(--muted); }
+
+.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; margin-bottom: 18px; }
+.top > div:first-child { display: grid; gap: 6px; min-width: 0; max-width: 46rem; flex: 1 1 22rem; }
+.top-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.btn {
+  border: 1px solid var(--line-2); background: var(--surface); border-radius: 8px; padding: 7px 12px;
+  cursor: pointer; font-weight: 500; white-space: nowrap;
+}
+.btn:hover { border-color: var(--ink-2); }
+.lang { display: inline-flex; border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.lang button { border: 0; background: transparent; padding: 7px 11px; cursor: pointer; font-weight: 600; font-size: 0.82rem; letter-spacing: 0.04em; color: var(--muted); }
+.lang button + button { border-left: 1px solid var(--line-2); }
+.lang button[aria-checked="true"] { background: var(--ink); color: var(--surface); }
+
+.layout { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+.layout > * { min-width: 0; max-width: 100%; }
+.summary, .details { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
+.inputs { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; align-content: start; }
+@media (min-width: 1040px) {
+  .layout { grid-template-columns: 410px minmax(0, 1fr); grid-template-areas: "inputs summary" "inputs details"; align-items: start; }
+  .inputs { grid-area: inputs; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow: auto; padding-right: 4px; overscroll-behavior: contain; }
+  .summary { grid-area: summary; }
+  .details { grid-area: details; }
+}
+
+/* ---------- Summary ---------- */
+.hero { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; display: grid; gap: 14px; }
+.hero-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; }
+.headline { overflow-wrap: anywhere; font-family: var(--font-display); font-size: clamp(1.4rem, 1.05rem + 1.6vw, 2.1rem); font-weight: 700; letter-spacing: -0.015em; line-height: 1.15; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 10px; font-size: 0.78rem; font-weight: 600; border: 1px solid var(--line-2); background: var(--surface-2); }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.dot.buy { background: var(--buy); } .dot.fi { background: var(--fi); }
+.vsbars { display: grid; gap: 8px; }
+.vsrow { display: grid; grid-template-columns: minmax(0, 11rem) minmax(0, 1fr); gap: 4px 12px; align-items: center; }
+.vsrow .lab { display: flex; gap: 8px; align-items: center; color: var(--ink-2); }
+.track { position: relative; height: 26px; }
+.fill { position: absolute; left: 0; top: 4px; height: 18px; border-radius: 0 4px 4px 0; }
+.fill.buy { background: var(--buy); } .fill.fi { background: var(--fi); }
+.track .amt { position: absolute; top: 3px; font-weight: 600; white-space: nowrap; }
+@media (max-width: 520px) { .vsrow { grid-template-columns: minmax(0, 1fr); } }
+
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 860px) { .stats { grid-template-columns: minmax(0, 1fr); } }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.stat .k { color: var(--ink-2); font-weight: 500; }
+.stat .v { font-family: var(--font-display); font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; }
+.stat .s { color: var(--muted); font-size: 0.85rem; }
+.stat .s b { color: var(--ink-2); font-weight: 600; }
+
+/* ---------- Inputs ---------- */
+.group { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.group > summary {
+  list-style: none; cursor: pointer; padding: 12px 14px; display: flex; gap: 10px; align-items: baseline; justify-content: space-between;
+  font-family: var(--font-display); font-weight: 600; font-size: 0.98rem;
+}
+.group > summary::-webkit-details-marker { display: none; }
+.group > summary::after { content: "+"; font-family: var(--font-body); color: var(--muted); font-weight: 400; font-size: 1.1rem; margin-left: 4px; }
+.group[open] > summary::after { content: "−"; }
+.group > summary .sum-note { font-family: var(--font-body); font-weight: 400; font-size: 0.8rem; color: var(--muted); margin-left: auto; text-align: right; }
+.fields { display: grid; gap: 10px; padding: 2px 14px 14px; }
+.fields > * { min-width: 0; }
+.sub { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding-top: 6px; border-top: 1px solid var(--line); margin-top: 4px; }
+.field { display: grid; grid-template-columns: minmax(0, 1fr) 9.6rem; gap: 2px 10px; align-items: center; }
+.field > .label { color: var(--ink-2); font-size: 0.86rem; line-height: 1.3; }
+.field > .hint, .field > .calc, .field > .tipbody { grid-column: 1 / -1; }
+.hint { color: var(--muted); font-size: 0.76rem; line-height: 1.35; }
+.calc { font-size: 0.78rem; color: var(--ink-2); }
+.calc.bad { color: var(--bad); } .calc.good { color: var(--good); }
+.inbox { display: flex; align-items: center; border: 1px solid var(--line-2); border-radius: 7px; background: var(--surface-2); min-width: 0; }
+.inbox:focus-within { border-color: var(--buy); }
+.inbox input { flex: 1; min-width: 0; width: 100%; border: 0; background: transparent; color: var(--ink); font: inherit; padding: 6px 8px; text-align: right; font-variant-numeric: tabular-nums; outline: none; }
+.inbox input[type="month"], .inbox input.text { text-align: left; }
+.inbox input::placeholder { color: var(--muted); }
+.inbox .pre, .inbox .suf { color: var(--muted); font-size: 0.78rem; padding: 0 7px; white-space: nowrap; }
+.inbox .pre { padding-right: 0; }
+.inbox:has(input[aria-invalid="true"]) { border-color: var(--bad); }
+.field.wide { grid-template-columns: minmax(0, 1fr); }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line-2); border-radius: 7px; overflow: hidden; background: var(--surface-2); justify-self: end; }
+.field.wide .seg { justify-self: stretch; }
+.seg button { border: 0; background: transparent; padding: 6px 10px; cursor: pointer; font-size: 0.82rem; flex: 1; white-space: nowrap; }
+.seg button + button { border-left: 1px solid var(--line-2); }
+.seg button[aria-checked="true"] { background: var(--ink); color: var(--surface); font-weight: 600; }
+.check { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; color: var(--ink-2); font-size: 0.86rem; line-height: 1.35; }
+.check input { margin: 2px 0 0; width: 16px; height: 16px; accent-color: var(--buy); flex: none; }
+.presets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.preset { text-align: left; border: 1px solid var(--line-2); background: var(--surface-2); border-radius: 8px; padding: 8px 10px; cursor: pointer; display: grid; gap: 2px; }
+.preset b { font-weight: 600; }
+.preset span { font-size: 0.75rem; color: var(--muted); }
+.preset[aria-pressed="true"] { border-color: var(--buy); background: var(--buy-soft); }
+.tip { border: 1px solid var(--line-2); background: var(--surface); width: 18px; height: 18px; border-radius: 50%; font-size: 0.7rem; line-height: 1; cursor: pointer; padding: 0; margin-left: 4px; color: var(--ink-2); vertical-align: 1px; }
+.tipbody { background: var(--surface-2); border: 1px solid var(--line); border-radius: 7px; padding: 8px 10px; font-size: 0.8rem; color: var(--ink-2); }
+.linkbtn { border: 0; background: none; padding: 0; color: var(--buy); cursor: pointer; font-size: 0.76rem; text-decoration: underline; }
+.consist { display: grid; gap: 2px; font-size: 0.8rem; background: var(--surface-2); border: 1px solid var(--line); border-radius: 7px; padding: 8px 10px; }
+.consist div { display: flex; justify-content: space-between; gap: 8px; }
+.consist .diff { font-weight: 600; border-top: 1px solid var(--line); padding-top: 3px; margin-top: 2px; }
+.consist .diff.off { color: var(--bad); }
+
+/* ---------- Panels ---------- */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
+.panel > *, .hero > * { min-width: 0; }
+#grid { display: grid; gap: 10px; }
+.panel > .intro { color: var(--muted); font-size: 0.85rem; max-width: 62ch; }
+details.panel { display: block; }
+details.panel[open] > summary { margin-bottom: 12px; }
+details.panel > .tablewrap { max-width: 100%; }
+details.panel > summary { cursor: pointer; font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; list-style: none; display: flex; justify-content: space-between; gap: 8px; }
+details.panel > summary::-webkit-details-marker { display: none; }
+details.panel > summary::after { content: attr(data-show); font-family: var(--font-body); font-weight: 500; font-size: 0.82rem; color: var(--buy); }
+details.panel[open] > summary::after { content: attr(data-hide); }
+
+.warnings { display: grid; gap: 8px; }
+.warn { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; border-radius: 8px; padding: 9px 12px; border: 1px solid var(--line); background: var(--surface); }
+.warn .sev { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; border-radius: 5px; padding: 2px 6px; margin-top: 1px; white-space: nowrap; }
+.warn.bad .sev { background: var(--bad-soft); color: var(--bad); }
+.warn.warn .sev { background: var(--warn-soft); color: var(--warn); }
+.warn.info .sev { background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.85rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend b { color: var(--ink); font-weight: 600; }
+.swatch-line { width: 16px; height: 3px; border-radius: 2px; display: inline-block; }
+.chart { position: relative; width: 100%; min-width: 0; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--muted); font-family: var(--font-body); font-size: 11px; font-variant-numeric: tabular-nums; paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.chart .lbl { fill: var(--ink-2); font-size: 12px; }
+.chart .lbl-strong { fill: var(--ink); font-size: 12px; font-weight: 600; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .axis { stroke: var(--line-2); stroke-width: 1; }
+.chart .ref { stroke: var(--ink-2); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.chart .ref-buy { stroke: var(--buy); stroke-width: 1.5; stroke-dasharray: 2 3; }
+.chart .l-buy { stroke: var(--buy); fill: none; stroke-width: 2; }
+.chart .l-fi { stroke: var(--fi); fill: none; stroke-width: 2; }
+.chart .a-fi { fill: var(--fi); opacity: 0.08; }
+.chart .m-buy { fill: var(--buy); stroke: var(--surface); stroke-width: 2; }
+.chart .m-fi { fill: var(--fi); stroke: var(--surface); stroke-width: 2; }
+.chart .cross { stroke: var(--ink-2); stroke-width: 1; }
+.chart .db-line { stroke: var(--line-2); stroke-width: 6; stroke-linecap: round; }
+.chart .db-dot { fill: var(--ink-2); stroke: var(--surface); stroke-width: 2; }
+.chart .hit { fill: transparent; }
+.tooltip {
+  position: fixed; z-index: 30; pointer-events: none; background: var(--ink); color: var(--surface);
+  border-radius: 7px; padding: 7px 10px; font-size: 0.8rem; line-height: 1.4; max-width: 260px; box-shadow: 0 4px 16px rgb(0 0 0 / 0.18);
+  font-variant-numeric: tabular-nums;
+}
+.tooltip b { font-weight: 600; }
+.tooltip .row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.tooltip .row span:first-child { display: inline-flex; gap: 6px; align-items: center; }
+
+.tablewrap { overflow-x: auto; min-width: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+th, td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 600; color: var(--ink-2); font-size: 0.78rem; background: var(--surface-2); }
+tr.total td { font-weight: 600; border-top: 1px solid var(--line-2); }
+tr.strong td { font-weight: 700; }
+tr.indent td:first-child { padding-left: 24px; color: var(--ink-2); }
+tr.sect td { background: var(--surface-2); color: var(--muted); font-size: 0.72rem; letter-spacing: 0.07em; text-transform: uppercase; font-weight: 600; }
+td.zero { color: var(--muted); }
+td.neg { color: var(--ink-2); }
+.breakdown td:first-child { white-space: normal; min-width: 12rem; }
+.monthly-table td:first-child, .monthly-table th:first-child { position: sticky; left: 0; background: var(--surface); }
+.monthly-table th:first-child { background: var(--surface-2); }
+
+.gridtable td.base { outline: 2px solid var(--ink-2); outline-offset: -2px; font-weight: 600; }
+.gridtable td.win { color: var(--good); }
+.gridtable td.win::before { content: "✓ "; }
+.gridnote { font-size: 0.8rem; color: var(--muted); }
+
+.notes { font-size: 0.86rem; color: var(--ink-2); }
+.notes h3 { font-size: 0.92rem; color: var(--ink); margin-top: 6px; }
+.notes ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.notes p { max-width: 70ch; }
+
+.foot { display: grid; gap: 10px; justify-items: start; padding: 8px 2px; }
+.quiet { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 0.78rem; padding: 2px 0; text-decoration: underline dotted; }
+.pass { color: var(--good); font-weight: 700; } .fail { color: var(--bad); font-weight: 700; }
+
+.bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: none;
+  background: var(--surface); border-top: 1px solid var(--line-2);
+  padding: 9px max(16px, env(safe-area-inset-right, 0px)) calc(9px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  box-shadow: 0 -4px 14px rgb(0 0 0 / 0.08);
+}
+.bar .in { display: flex; gap: 6px 14px; flex-wrap: wrap; justify-content: space-between; align-items: center; max-width: 1320px; margin: 0 auto; font-size: 0.85rem; }
+.bar b { font-weight: 700; }
+@media (max-width: 1039px) { .bar.show { display: block; } }
+@media (prefers-reduced-motion: no-preference) { .fill { transition: width 0.25s ease; } }
+</style>
+
+<div class="page">
+  <header class="top">
+    <div>
+      <p class="eyebrow" data-i18n="eyebrow"></p>
+      <h1 data-i18n="title"></h1>
+      <p class="muted" data-i18n="subtitle"></p>
+    </div>
+    <div class="top-actions">
+      <div class="lang" role="radiogroup" aria-label="Language / Idioma">
+        <button type="button" role="radio" data-lang="en" lang="en">EN</button>
+        <button type="button" role="radio" data-lang="pt" lang="pt-BR">PT</button>
+      </div>
+      <button type="button" class="btn" id="reset" data-i18n="reset"></button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="summary" id="summary" aria-live="polite"></section>
+    <aside class="inputs" id="inputs"></aside>
+    <section class="details" id="details">
+      <div class="warnings" id="warnings"></div>
+
+      <article class="panel">
+        <h2 data-i18n="cumTitle"></h2>
+        <p class="intro" data-i18n="cumIntro"></p>
+        <div class="legend" id="cum-legend"></div>
+        <div class="chart" id="chart-cum"></div>
+      </article>
+
+      <article class="panel">
+        <h2 data-i18n="bdTitle"></h2>
+        <div class="tablewrap" id="breakdown"></div>
+      </article>
+
+      <article class="panel">
+        <h2 data-i18n="torTitle"></h2>
+        <p class="intro" data-i18n="torIntro"></p>
+        <div class="chart" id="chart-tornado"></div>
+      </article>
+
+      <article class="panel">
+        <h2 data-i18n="gridTitle"></h2>
+        <div id="grid"></div>
+      </article>
+
+      <details class="panel" id="monthly">
+        <summary data-i18n="monthlyTitle"></summary>
+        <div class="tablewrap" id="monthly-table"></div>
+      </details>
+
+      <article class="panel notes" id="notes"></article>
+
+      <footer class="foot">
+        <button type="button" class="quiet" id="run-tests" data-i18n="runTests"></button>
+        <div id="tests" hidden></div>
+      </footer>
+    </section>
+  </main>
+</div>
+<div class="bar" id="bar"><div class="in" id="bar-in"></div></div>
+<div class="tooltip" id="tip" hidden></div>
+
+<!-- ENGINE -->
+<script>
+;(function () {
+  'use strict'
+  const E = window.OffplanEngine
+  const D = E.DEFAULTS
+  const STORE_KEY = 'na-planta-flip:inputs:v1'
+  const OPEN_KEY = 'na-planta-flip:open:v1'
+  const LANG_KEY = 'na-planta-flip:lang:v1'
+  const $ = (s) => document.querySelector(s)
+
+  // ---------- Storage ----------
+  const store = {
+    get(key) { try { return JSON.parse(localStorage.getItem(key) || 'null') } catch (e) { return null } },
+    set(key, v) { try { localStorage.setItem(key, JSON.stringify(v)) } catch (e) { /* storage unavailable */ } },
+  }
+
+  // ---------- Language ----------
+  let lang = store.get(LANG_KEY)
+  if (lang !== 'en' && lang !== 'pt') {
+    let nav = ''
+    try { nav = (navigator.language || '').toLowerCase() } catch (e) { /* ignore */ }
+    lang = nav.startsWith('pt') ? 'pt' : 'en'
+  }
+  /** Pick the string for the current language. */
+  const L = (en, pt) => (lang === 'pt' ? pt : en)
+  /** Strings stored as [en, pt] pairs. */
+  const tx = (pair) => (Array.isArray(pair) ? L(pair[0], pair[1]) : pair || '')
+  const plural = (n, one, many) => (n === 1 ? one : many)
+
+  // ---------- Formatting (money is always Brazilian: R$ 1.234,56) ----------
+  const fBRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+  const fBRL0 = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0, minimumFractionDigits: 0 })
+  const ok = (v) => v != null && Number.isFinite(v)
+  const brl = (v) => (ok(v) ? fBRL.format(v) : '—')
+  const brl0 = (v) => (ok(v) ? fBRL0.format(v) : '—')
+  const pct = (x, d = 1) => (ok(x) ? (x * 100).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }) + '%' : '—')
+  const spct = (x, d = 1) => (ok(x) ? (x > 0 ? '+' : x < 0 ? '−' : '') + pct(Math.abs(x), d) : '—')
+  const nfmt = (v, d = 4) => (ok(v) ? v.toLocaleString('pt-BR', { maximumFractionDigits: d, useGrouping: false }) : '')
+  const short = (v) => {
+    if (!ok(v)) return '—'
+    const a = Math.abs(v)
+    if (a >= 1e6) return 'R$ ' + (v / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + ' mi'
+    if (a >= 1e3) return 'R$ ' + (v / 1e3).toLocaleString('pt-BR', { maximumFractionDigits: a >= 1e5 ? 0 : 1 }) + ' mil'
+    return 'R$ ' + Math.round(v)
+  }
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+  const monthLabel = (d) => d.toLocaleDateString(L('en-US', 'pt-BR'), { month: 'short', year: 'numeric', timeZone: 'UTC' })
+
+  function parseNum(str, money) {
+    let s = String(str).replace(/R\$|\s|%| /g, '')
+    if (!s) return null
+    if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.')
+    else if (money && /^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '')
+    const v = Number(s)
+    return Number.isFinite(v) ? v : NaN
+  }
+
+  // ---------- Static text ----------
+  const STATIC = {
+    eyebrow: ['São Paulo · off-plan property (imóvel na planta)', 'São Paulo · imóvel na planta'],
+    title: ['Buy off-plan and resell at the keys, or keep the money in fixed income?', 'Comprar na planta e revender na entrega das chaves, ou deixar o dinheiro na renda fixa?'],
+    subtitle: ['Every number updates as you type. Your inputs are saved in this browser.', 'Os números se atualizam enquanto você digita. Seus dados ficam salvos neste navegador.'],
+    reset: ['Reset to defaults', 'Restaurar padrões'],
+    cumTitle: ['Cash in vs the fixed-income alternative', 'Dinheiro investido x alternativa em renda fixa'],
+    cumIntro: [
+      'Blue is what you have paid out of pocket so far. Orange is what the same payments would be worth if they had stayed in fixed income. The dot is what you keep after selling at your expected price.',
+      'Azul é o que você já pagou do próprio bolso. Laranja é quanto esses mesmos pagamentos valeriam se tivessem ficado na renda fixa. O ponto é o que sobra para você depois de vender pelo preço esperado.',
+    ],
+    bdTitle: ['Where the money goes', 'Para onde vai o dinheiro'],
+    torTitle: ['What moves the break-even', 'O que mexe no preço de equilíbrio'],
+    torIntro: [
+      'Break-even resale price when one input changes and everything else stays as entered. Sorted by impact. The dashed line is the current break-even; the blue dotted line is your expected sale price.',
+      'Preço de revenda de equilíbrio quando um dado muda e o resto fica como está. Ordenado por impacto. A linha tracejada é o equilíbrio atual; a linha pontilhada azul é o seu preço de venda esperado.',
+    ],
+    gridTitle: ['Break-even grid', 'Tabela de equilíbrio'],
+    monthlyTitle: ['Month by month', 'Mês a mês'],
+    runTests: ['Run tests', 'Rodar testes'],
+  }
+
+  const NOTES = {
+    en: `
+      <h2>Notes</h2>
+      <h3>What each cost is</h3>
+      <ul>
+        <li><b>Developer installments</b> (ato, mensais, anuais, chaves) are corrected by INCC from the contract month until paid. After the keys, contracts usually switch to IPCA or IGP-M plus about 1% a month, which is the post-keys index here.</li>
+        <li><b>Construction-phase charges (juros de obra)</b> exist only in the associativo structure. Caixa charges interest and TR on the money already released to the builder, plus MIP and DFI insurance and a R$ 25 monthly fee. Nothing is amortized, so the charge grows as the building progresses.</li>
+        <li><b>Repasse na entrega</b> means the bank loan starts only at the keys. Until then the financed part is owed to the developer and corrected by INCC. Caixa lends up to the LTV cap times the appraisal at the keys; you pay any difference in cash.</li>
+        <li><b>ITBI</b> is the São Paulo city transfer tax, due when the deed is registered. <b>Registry</b> covers the property registration and the fiduciary lien (alienação fiduciária).</li>
+        <li><b>At the sale</b> you pay the broker, capital gains tax, the bank balance (no prepayment fee), any remaining developer balance, and the lien release.</li>
+      </ul>
+      <h3>Values set by law</h3>
+      <ul>
+        <li>São Paulo ITBI 2026: 3% general rate; 0.5% on up to R$ 120,968 of SFH financing for units up to R$ 725,808.</li>
+        <li>Lei 6.015/1973, art. 290: 50% off registry fees on a first SFH home purchase.</li>
+        <li>STF Tema 1124: ITBI is due only on registration, so a cessão de direitos does not trigger it for the seller.</li>
+        <li>Capital gains: 15% up to R$ 5 million. FR2 reduction factor and the 180-day reinvestment exemption: Lei 11.196/2005, arts. 39 and 40. Single-property exemption up to R$ 440,000: Lei 9.250/1995, art. 23.</li>
+        <li>Interest and other charges paid to buy the property can enter the cost basis: IN SRF 84/2001, art. 17. This page leaves insurance and fees out to stay conservative.</li>
+        <li>Fixed-income tax (IR) by calendar days held: 22.5% up to 180 days, 20% up to 360, 17.5% up to 720, 15% above (Lei 11.033/2004). LCI and LCA are exempt.</li>
+        <li>No prepayment fee on consumer mortgages: Resolução CMN 3.516/2007.</li>
+      </ul>
+      <h3>Assumptions you can change</h3>
+      <ul>
+        <li>Caixa rates and LTV caps (SBPE 11.49% effective + TR, 80% SAC / 70% PRICE; MCMV Classe Média 10% nominal + TR, 90% / 80%), checked in November 2026.</li>
+        <li>TR, insurance rates, the release curve, the appraisal values, the broker commission and the post-keys index are estimates.</li>
+        <li>Annual rates become monthly with (1 + annual)<sup>1/12</sup> − 1, except a bank rate marked as nominal (divided by 12).</li>
+      </ul>
+      <p><b>This is a simulation, not financial or tax advice.</b> Confirm the contract terms with the developer and Caixa, and the tax treatment with an accountant.</p>`,
+    pt: `
+      <h2>Notas</h2>
+      <h3>O que é cada custo</h3>
+      <ul>
+        <li><b>Parcelas da construtora</b> (ato, mensais, anuais, chaves) são corrigidas pelo INCC desde o mês do contrato até o pagamento. Depois das chaves, os contratos costumam passar para IPCA ou IGP-M mais cerca de 1% ao mês, que é o índice pós-chaves aqui.</li>
+        <li><b>Juros de obra (taxa de evolução de obra)</b> só existem no associativo. A Caixa cobra juros e TR sobre o valor já liberado à construtora, mais os seguros MIP e DFI e uma tarifa de R$ 25 por mês. Não há amortização, então a cobrança cresce conforme a obra avança.</li>
+        <li><b>Repasse na entrega</b>: o financiamento só começa nas chaves. Até lá, a parte financiada é devida à construtora e corrigida pelo INCC. A Caixa financia até a cota máxima vezes a avaliação na entrega; a diferença você paga à vista.</li>
+        <li><b>ITBI</b> é o imposto de transmissão da cidade de São Paulo, devido no registro da escritura. O <b>registro</b> cobre o registro do imóvel e da alienação fiduciária.</li>
+        <li><b>Na venda</b> você paga o corretor, o imposto sobre ganho de capital, o saldo devedor do banco (sem multa de quitação), o saldo restante da construtora e a baixa da alienação.</li>
+      </ul>
+      <h3>Valores definidos em lei</h3>
+      <ul>
+        <li>ITBI São Paulo 2026: alíquota geral de 3%; 0,5% sobre até R$ 120.968 financiados pelo SFH, para imóveis de até R$ 725.808.</li>
+        <li>Lei 6.015/1973, art. 290: 50% de desconto nos emolumentos de registro na primeira aquisição residencial pelo SFH.</li>
+        <li>STF Tema 1124: o ITBI só é devido no registro, por isso a cessão de direitos não gera ITBI para quem vende.</li>
+        <li>Ganho de capital: 15% até R$ 5 milhões. Fator de redução FR2 e isenção por reinvestimento em 180 dias: Lei 11.196/2005, arts. 39 e 40. Isenção de imóvel único até R$ 440.000: Lei 9.250/1995, art. 23.</li>
+        <li>Juros e demais acréscimos pagos na aquisição podem entrar no custo: IN SRF 84/2001, art. 17. Esta página deixa seguros e tarifas de fora, por conservadorismo.</li>
+        <li>IR na renda fixa por dias corridos: 22,5% até 180 dias, 20% até 360, 17,5% até 720, 15% acima disso (Lei 11.033/2004). LCI e LCA são isentas.</li>
+        <li>Sem multa por quitação antecipada em financiamento ao consumidor: Resolução CMN 3.516/2007.</li>
+      </ul>
+      <h3>Premissas que você pode alterar</h3>
+      <ul>
+        <li>Taxas e cotas da Caixa (SBPE 11,49% efetiva + TR, 80% SAC / 70% PRICE; MCMV Classe Média 10% nominal + TR, 90% / 80%), conferidas em novembro de 2026.</li>
+        <li>TR, seguros, curva de liberação, avaliações, comissão do corretor e índice pós-chaves são estimativas.</li>
+        <li>Taxas anuais viram mensais por (1 + anual)<sup>1/12</sup> − 1, exceto a taxa do banco marcada como nominal (dividida por 12).</li>
+      </ul>
+      <p><b>Esta é uma simulação, não uma recomendação financeira ou tributária.</b> Confirme as condições do contrato com a construtora e a Caixa, e o tratamento tributário com um contador.</p>`,
+  }
+
+  // Unit suffixes shown inside the input boxes
+  const SUF = {
+    months: ['months', 'meses'],
+    pctYr: ['% / yr', '% a.a.'],
+    pctMo: ['% / mo', '% a.m.'],
+    perMo: ['/ mo', '/ mês'],
+    pct: ['%', '%'],
+    pctPrice: ['% of price', '% do preço'],
+    pctSale: ['% of sale', '% da venda'],
+    times: ['×', '×'],
+  }
+
+  // ---------- Input schema (label/hint/options are [en, pt] pairs) ----------
+  const yesNo = [[true, ['Yes', 'Sim']], [false, ['No', 'Não']]]
+  const SECTIONS = [
+    {
+      id: 'property', title: ['Property and payment plan', 'Imóvel e plano de pagamento'], open: true,
+      fields: [
+        { k: 'price', t: 'money', label: ['Property price (valor do imóvel)', 'Valor do imóvel'] },
+        { k: 'monthsToKeys', t: 'int', label: ['Months from purchase to key delivery', 'Meses da compra até a entrega das chaves'], suf: 'months', min: 1 },
+        { k: 'startMonth', t: 'month', label: ['Contract month (month 0)', 'Mês do contrato (mês 0)'], hint: ['Sets the calendar dates and the fixed-income tax brackets.', 'Define as datas do calendário e as faixas de IR da renda fixa.'] },
+        { t: 'sub', label: ['Developer payment plan', 'Plano de pagamento da construtora'] },
+        { k: 'downPayment', t: 'money', label: ['Down payment at signing (ato/sinal)', 'Ato / sinal na assinatura'], hint: ['Paid at month 0.', 'Pago no mês 0.'] },
+        { k: 'nMonthly', t: 'int', label: ['Number of monthly installments', 'Quantidade de parcelas mensais'], suf: 'times', hint: ['They start at month 1.', 'Começam no mês 1.'] },
+        { k: 'monthlyAmt', t: 'money', label: ['Monthly installment amount', 'Valor da parcela mensal'], hint: ['Base value before INCC.', 'Valor base, antes do INCC.'] },
+        { k: 'nAnnual', t: 'int', label: ['Number of annual installments', 'Quantidade de parcelas anuais'], suf: 'times' },
+        { k: 'annualAmt', t: 'money', label: ['Annual installment amount', 'Valor da parcela anual'] },
+        { k: 'annualMonths', t: 'text', label: ['Months of the annual installments', 'Meses das parcelas anuais'], hint: ['Comma-separated, e.g. 12, 24, 36.', 'Separados por vírgula, ex.: 12, 24, 36.'] },
+        { k: 'keysPayment', t: 'money', label: ['Payment due at keys (chaves)', 'Parcela das chaves'], hint: ['Covers gaps between the price and the rest of the plan.', 'Cobre a diferença entre o preço e o resto do plano.'] },
+        { k: 'financed', t: 'money', label: ['Amount financed by the bank', 'Valor financiado pelo banco'], calc: true },
+        { t: 'html', id: 'consistency' },
+        { t: 'sub', label: ['Correction', 'Correção'] },
+        { k: 'incc', t: 'pct', label: ['INCC', 'INCC'], suf: 'pctYr', hint: ['Corrects every developer installment from month 0 until it is paid.', 'Corrige cada parcela da construtora do mês 0 até o pagamento.'] },
+        { k: 'postKeysIndex', t: 'pct', label: ['Post-keys index for remaining installments', 'Índice pós-chaves das parcelas restantes'], suf: 'pctYr', hint: ['e.g. IPCA + 1% a month. Applies from the keys on.', 'Ex.: IPCA + 1% a.m. Vale a partir das chaves.'] },
+        { k: 'settleAtSale', t: 'seg', label: ['Settle remaining developer installments at the sale?', 'Quitar o saldo com a construtora na venda?'], opts: yesNo, wide: true, hint: ['Yes: paid off from the proceeds at the corrected value, minus the discount. No: the buyer takes over the balance at its corrected value (needs the developer’s consent).', 'Sim: quitado com o dinheiro da venda pelo valor corrigido, menos o desconto. Não: o comprador assume o saldo pelo valor corrigido (exige anuência da construtora).'] },
+        { k: 'earlyDiscount', t: 'pct', label: ['Discount for early payoff of the developer balance', 'Desconto na quitação antecipada do saldo'], suf: 'pct', show: (s) => s.settleAtSale },
+        { t: 'sub', label: ['Appraisal', 'Avaliação'] },
+        { k: 'appraisalValue', t: 'money', label: ['Appraisal value', 'Valor de avaliação'], auto: (r) => r.p.price, hint: ['Leave empty to use the price. Used for DFI insurance and the associativo LTV check.', 'Deixe vazio para usar o preço. Usado no seguro DFI e na checagem de cota do associativo.'] },
+        { k: 'appraisalAtKeys', t: 'money', label: ['Appraisal value at keys', 'Valor de avaliação na entrega'], auto: (r) => r.appraisalKeysAuto, hint: ['Leave empty for the price corrected by INCC to the keys. Under repasse, Caixa lends up to the LTV cap times this.', 'Deixe vazio para usar o preço corrigido pelo INCC até as chaves. No repasse, a Caixa financia até a cota máxima vezes este valor.'] },
+      ],
+    },
+    {
+      id: 'bank', title: ['Bank financing (Caixa)', 'Financiamento bancário (Caixa)'], open: false,
+      fields: [
+        { t: 'html', id: 'presets' },
+        { k: 'structure', t: 'seg', label: ['Contract structure', 'Modalidade do contrato'], opts: [['associativo', ['Associativo', 'Associativo']], ['repasse', ['Repasse na entrega', 'Repasse na entrega']]], wide: true, hint: ['Associativo: bank contract at month 0, construction-phase charges until the keys. Repasse: no bank loan before the keys; the financed amount is owed to the developer with INCC.', 'Associativo: contrato com o banco no mês 0 e juros de obra até as chaves. Repasse: sem financiamento antes das chaves; o valor financiado fica devido à construtora com INCC.'] },
+        { k: 'system', t: 'seg', label: ['Amortization system', 'Sistema de amortização'], opts: [['SAC', ['SAC', 'SAC']], ['PRICE', ['PRICE', 'PRICE']]], hint: ['Only matters for months held after the keys and for the first-installment estimate.', 'Só importa nos meses após as chaves e na estimativa da primeira prestação.'] },
+        { k: 'bankRate', t: 'pct', label: ['Interest rate', 'Taxa de juros'], suf: 'pctYr' },
+        { k: 'rateNominal', t: 'seg', label: ['Rate convention', 'Convenção da taxa'], opts: [[false, ['Effective', 'Efetiva']], [true, ['Nominal ÷12', 'Nominal ÷12']]] },
+        { k: 'tr', t: 'pct', label: ['TR', 'TR'], suf: 'pctMo' },
+        { k: 'ltvSac', t: 'pct', label: ['LTV cap with SAC', 'Cota máxima com SAC'], suf: 'pct' },
+        { k: 'ltvPrice', t: 'pct', label: ['LTV cap with PRICE', 'Cota máxima com PRICE'], suf: 'pct' },
+        { k: 'term', t: 'int', label: ['Loan term', 'Prazo do financiamento'], suf: 'months', min: 1 },
+        { k: 'mip', t: 'pct', label: ['MIP insurance', 'Seguro MIP'], suf: 'pctMo', hint: ['Percent of the balance each month. Depends on age.', 'Percentual do saldo devedor por mês. Depende da idade.'] },
+        { k: 'dfi', t: 'pct', label: ['DFI insurance', 'Seguro DFI'], suf: 'pctMo', hint: ['Percent of the appraisal value each month.', 'Percentual do valor de avaliação por mês.'] },
+        { k: 'adminFee', t: 'money', label: ['Admin fee (taxa de administração)', 'Taxa de administração'], suf: 'perMo' },
+        { k: 'appraisalFee', t: 'money', label: ['Appraisal fee (avaliação)', 'Taxa de avaliação'], hint: ['Waived when the development is Caixa-financed; otherwise about R$ 950.', 'Isenta quando o empreendimento é financiado pela Caixa; senão, cerca de R$ 950.'] },
+        { t: 'html', id: 'first' },
+        { t: 'sub', label: ['Construction phase (associativo)', 'Fase de obra (associativo)'] },
+        { t: 'html', id: 'constr' },
+        { k: 'releasedAtSigning', t: 'pct', label: ['Construction released at signing', 'Percentual da obra liberado na assinatura'], suf: 'pct' },
+        { k: 'releaseCurve', t: 'seg', label: ['Release curve', 'Curva de liberação'], opts: [['linear', ['Linear', 'Linear']], ['s', ['S-curve', 'Curva S']]], hint: ['From the signing share to 100% at the keys.', 'Do percentual da assinatura até 100% nas chaves.'] },
+        { k: 'averbacaoMonths', t: 'int', label: ['Charges after keys, until averbação do habite-se', 'Juros de obra após as chaves, até a averbação do habite-se'], suf: 'months', hint: ['Each month charges the full balance. Repayment starts after these months.', 'Cada mês cobra sobre o saldo total. A amortização começa depois desses meses.'] },
+        { k: 'allIn', t: 'check', label: ['Use a single all-in annual cost rate instead of rate + TR + insurance + fee', 'Usar um custo efetivo total (CET) anual no lugar de taxa + TR + seguros + tarifa'] },
+        { k: 'allInRate', t: 'pct', label: ['All-in annual cost', 'CET anual'], suf: 'pctYr', show: (s) => s.allIn, hint: ['Caixa SBPE costs about 13.4–13.6% a year all-in; MCMV about 12.4%.', 'O SBPE da Caixa custa cerca de 13,4–13,6% a.a. no total; o MCMV, cerca de 12,4%.'] },
+        { t: 'sub', label: ['MCMV Classe Média limits', 'Limites do MCMV Classe Média'] },
+        { k: 'mcmvIncomeLimit', t: 'money', label: ['Family income limit', 'Limite de renda familiar'], suf: 'perMo' },
+        { k: 'mcmvPriceLimit', t: 'money', label: ['Unit price limit', 'Valor máximo do imóvel'] },
+      ],
+    },
+    {
+      id: 'acq', title: ['Acquisition costs (São Paulo city)', 'Custos de aquisição (cidade de São Paulo)'], open: false,
+      fields: [
+        { k: 'itbiOverride', t: 'money', label: ['ITBI', 'ITBI'], auto: (r) => r.itbiAuto, calc: true, hint: ['Leave empty to calculate it with the rule below.', 'Deixe vazio para calcular pela regra abaixo.'] },
+        { k: 'itbiRate', t: 'pct', label: ['ITBI general rate', 'Alíquota geral do ITBI'], suf: 'pct' },
+        { k: 'itbiReducedRate', t: 'pct', label: ['Reduced rate on the SFH-financed part', 'Alíquota reduzida sobre a parte financiada (SFH)'], suf: 'pct' },
+        { k: 'itbiReducedCap', t: 'money', label: ['Financed part eligible for the reduced rate, cap', 'Teto da parte financiada com alíquota reduzida'], hint: ['2026 value.', 'Valor de 2026.'] },
+        { k: 'itbiMaxValue', t: 'money', label: ['Maximum property value for the reduced rate', 'Valor máximo do imóvel para a alíquota reduzida'], hint: ['2026 value.', 'Valor de 2026.'] },
+        { k: 'itbiExemptCeiling', t: 'money', label: ['First-property exemption ceiling', 'Teto da isenção para primeiro imóvel'], hint: ['Full exemption at or below this (MCMV/HIS).', 'Isenção total até este valor (MCMV/HIS).'] },
+        { k: 'firstProperty', t: 'check', label: ['First property (eligible for the ITBI exemption)', 'Primeiro imóvel (elegível à isenção de ITBI)'] },
+        { k: 'valorVenal', t: 'money', label: ['Valor venal de referência', 'Valor venal de referência'], auto: (r) => r.p.price, hint: ['ITBI base is the higher of this and the price.', 'A base do ITBI é o maior entre este valor e o preço.'] },
+        { t: 'sub', label: ['Registry', 'Registro'] },
+        { k: 'registry', t: 'money', label: ['Registry (registro + alienação fiduciária)', 'Registro do imóvel + alienação fiduciária'] },
+        { k: 'registryDiscount', t: 'check', label: ['First SFH residential purchase: 50% registry discount (Lei 6.015, art. 290)', 'Primeira aquisição residencial pelo SFH: 50% de desconto no registro (Lei 6.015, art. 290)'] },
+        { k: 'acqTiming', t: 'seg', label: ['When ITBI and registry are paid', 'Quando ITBI e registro são pagos'], opts: [['auto', ['Auto', 'Auto']], ['month0', ['Month 0', 'Mês 0']], ['keys', ['At keys', 'Nas chaves']]], wide: true, calc: true },
+      ],
+    },
+    {
+      id: 'exit', title: ['Exit', 'Saída'], open: true,
+      fields: [
+        { k: 'salePrice', t: 'money', label: ['Expected sale price', 'Preço de venda esperado'] },
+        { k: 'monthsAfterKeys', t: 'int', label: ['Months held after keys before selling', 'Meses com o imóvel após as chaves, antes de vender'], suf: 'months' },
+        { k: 'exitType', t: 'seg', label: ['Exit type', 'Tipo de saída'], opts: [['sale', ['Sale after keys', 'Venda após as chaves']], ['cessao', ['Cessão de direitos', 'Cessão de direitos']]], wide: true, hint: ['Cessão: you sell the contract before the transfer. Only with repasse na entrega. No bank loan, ITBI or registry for you; the buyer assumes the developer balance.', 'Cessão: você vende o contrato antes da transferência. Só com repasse na entrega. Sem financiamento, ITBI ou registro para você; o comprador assume o saldo com a construtora.'] },
+        { k: 'cessaoFee', t: 'pct', label: ['Cessão fee charged by the developer', 'Taxa de cessão cobrada pela construtora'], suf: 'pctPrice', show: (s) => s.exitType === 'cessao' },
+        { k: 'condoIptu', t: 'money', label: ['Condo fee + IPTU after keys', 'Condomínio + IPTU após as chaves'], suf: 'perMo' },
+        { k: 'commission', t: 'pct', label: ['Broker commission', 'Comissão do corretor'], suf: 'pctSale', hint: ['CRECI-SP reference is 6–8%; negotiable.', 'Referência do CRECI-SP: 6–8%; negociável.'] },
+        { k: 'lienRelease', t: 'money', label: ['Lien release (averbação de cancelamento)', 'Baixa da alienação (averbação de cancelamento)'] },
+        { t: 'sub', label: ['Capital gains tax', 'Imposto sobre ganho de capital'] },
+        { k: 'cgRate', t: 'pct', label: ['Capital gains tax rate', 'Alíquota do ganho de capital'], suf: 'pct' },
+        { k: 'applyFr2', t: 'check', label: ['Apply the FR2 reduction factor', 'Aplicar o fator de redução FR2'] },
+        { k: 'singlePropExempt', t: 'check', label: ['Single-property exemption (only property, no sale in the last 5 years)', 'Isenção de imóvel único (único imóvel, sem venda nos últimos 5 anos)'] },
+        { k: 'singlePropCeiling', t: 'money', label: ['Single-property exemption ceiling', 'Teto da isenção de imóvel único'], show: (s) => s.singlePropExempt },
+        { k: 'reinvest', t: 'check', label: ['Reinvest the proceeds in another home within 180 days (Lei 11.196, art. 39)', 'Reinvestir o valor em outro imóvel residencial em até 180 dias (Lei 11.196, art. 39)'] },
+      ],
+    },
+    {
+      id: 'fi', title: ['Fixed-income alternative', 'Alternativa em renda fixa'], open: true,
+      fields: [
+        { k: 'fiNet', t: 'pct', label: ['Net annual return (after tax)', 'Rentabilidade líquida anual (após IR)'], suf: 'pctYr', show: (s) => !s.fiGrossMode },
+        { k: 'fiGrossMode', t: 'check', label: ['Use a gross rate and apply income tax by holding period', 'Usar taxa bruta e aplicar o IR pelo prazo de cada aporte'] },
+        { k: 'fiGross', t: 'pct', label: ['Gross annual return', 'Rentabilidade bruta anual'], suf: 'pctYr', show: (s) => s.fiGrossMode },
+        { k: 'fiExempt', t: 'check', label: ['Tax-exempt (LCI/LCA)', 'Isento de IR (LCI/LCA)'], show: (s) => s.fiGrossMode },
+        { t: 'html', id: 'fi-calc' },
+      ],
+    },
+  ]
+  const FIELDS = {}
+  SECTIONS.forEach((s) => s.fields.forEach((f) => f.k && f.t !== 'html' && (FIELDS[f.k] = f)))
+
+  // ---------- Warnings: code -> sentence ----------
+  const WARN = {
+    cessaoInvalid: () => L('Cessão de direitos only works with repasse na entrega. Treated as a normal sale after keys.', 'A cessão de direitos só funciona com repasse na entrega. Tratada como venda normal após as chaves.'),
+    cessaoHeld: () => L('A cessão happens at the keys, so "months held after keys" is ignored.', 'A cessão acontece nas chaves, então os "meses após as chaves" são ignorados.'),
+    annualMismatch: (a) => L(`You set ${a.n} annual installments but listed only ${a.listed} months. Using the months listed.`, `Você indicou ${a.n} parcelas anuais, mas listou só ${a.listed} meses. Usando os meses listados.`),
+    averbRepasse: () => L('Construction charges after keys apply only to associativo contracts. Ignored under repasse.', 'Juros de obra após as chaves só se aplicam ao associativo. Ignorados no repasse.'),
+    ltvOver: (a) => L(
+      `The bank finances ${pct(a.pct)} of the price, above the ${a.line} ${a.sys} cap of ${pct(a.cap, 0)}. Caixa would lend at most about ${brl0(a.maxLoan)}.`,
+      `O banco financia ${pct(a.pct)} do preço, acima da cota de ${pct(a.cap, 0)} do ${a.line} com ${a.sys}. A Caixa financiaria no máximo cerca de ${brl0(a.maxLoan)}.`),
+    repasseGap: (a) => L(
+      `At the keys you owe the developer ${brl0(a.owed)} (INCC-corrected), but Caixa lends at most ${pct(a.cap, 0)} of the ${brl0(a.appraisal)} appraisal (${brl0(a.loan)}). You pay the ${brl0(a.gap)} difference in cash at the keys.`,
+      `Nas chaves você deve ${brl0(a.owed)} à construtora (corrigido pelo INCC), mas a Caixa financia no máximo ${pct(a.cap, 0)} da avaliação de ${brl0(a.appraisal)} (${brl0(a.loan)}). Você paga a diferença de ${brl0(a.gap)} à vista nas chaves.`),
+    mcmvPrice: (a) => L(`MCMV Classe Média only finances units up to ${brl0(a.limit)}. This unit costs ${brl0(a.price)}.`, `O MCMV Classe Média só financia imóveis de até ${brl0(a.limit)}. Este custa ${brl0(a.price)}.`),
+    devAfterSale: (a) => {
+      const en = { cessao: 'is assumed by the buyer', settle: 'is paid off from the sale proceeds', buyer: 'is taken over by the buyer' }[a.mode]
+      const pt = { cessao: 'é assumido pelo comprador', settle: 'é quitado com o dinheiro da venda', buyer: 'é assumido pelo comprador' }[a.mode]
+      return L(
+        `${a.count} developer ${plural(a.count, 'installment runs', 'installments run')} past the sale. ${brl0(a.amount)} ${en} at its corrected value.${a.mode === 'buyer' ? ' This needs the developer’s consent.' : ''}`,
+        `${a.count} ${plural(a.count, 'parcela da construtora vence', 'parcelas da construtora vencem')} depois da venda. O saldo de ${brl0(a.amount)} ${pt} pelo valor corrigido.${a.mode === 'buyer' ? ' Isso exige anuência da construtora.' : ''}`)
+    },
+    devAfterKeys: (a) => L(
+      `${a.count} developer ${plural(a.count, 'installment falls', 'installments fall')} between keys and sale and ${plural(a.count, 'is', 'are')} corrected by the post-keys index (${nfmt(a.index)}% a year): ${brl0(a.amount)} in total.`,
+      `${a.count} ${plural(a.count, 'parcela da construtora vence', 'parcelas da construtora vencem')} entre as chaves e a venda, ${plural(a.count, 'corrigida', 'corrigidas')} pelo índice pós-chaves (${nfmt(a.index)}% a.a.): ${brl0(a.amount)} no total.`),
+    mcmvIncome: (a) => L(
+      `The first ${a.sys} installment would be about ${brl0(a.inst)}, which needs a family income of about ${brl0(a.income)} (30% rule). MCMV Classe Média allows up to ${brl0(a.limit)}.`,
+      `A primeira prestação ${a.sys} seria de cerca de ${brl0(a.inst)}, o que exige renda familiar de cerca de ${brl0(a.income)} (regra dos 30%). O MCMV Classe Média aceita até ${brl0(a.limit)}.`),
+    singleProp: (a) => L(
+      `The sale price is under ${brl0(a.ceiling)}. If this is your only property and you haven't sold one in the last 5 years, the gain is tax-free. Tick the exemption under Exit.`,
+      `O preço de venda está abaixo de ${brl0(a.ceiling)}. Se este for seu único imóvel e você não vendeu outro nos últimos 5 anos, o ganho é isento. Marque a isenção em Saída.`),
+    beAbove5M: () => L('Even at R$ 5,000,000 the flip does not beat fixed income.', 'Mesmo a R$ 5.000.000 a revenda não supera a renda fixa.'),
+    beAboveExpected: (a) => L(
+      `The break-even price (${brl0(a.be)}) is above your expected sale price (${brl0(a.price)}).`,
+      `O preço de equilíbrio (${brl0(a.be)}) está acima do seu preço de venda esperado (${brl0(a.price)}).`),
+    planMismatch: (a) => L(
+      `The payment plan adds up to ${brl0(a.sum)}, which is ${brl0(Math.abs(a.diff))} ${a.diff > 0 ? 'below' : 'above'} the price.`,
+      `O plano de pagamento soma ${brl0(a.sum)}, ${brl0(Math.abs(a.diff))} ${a.diff > 0 ? 'abaixo' : 'acima'} do preço.`),
+    cessaoConsent: () => L('Cessão de direitos needs the developer’s consent, and the developer may charge a fee or forbid it.', 'A cessão de direitos exige anuência da construtora, que pode cobrar taxa ou proibi-la.'),
+  }
+
+  // ---------- Tornado labels ----------
+  const TOR = {
+    fi: { label: ['Fixed-income return', 'Rentabilidade da renda fixa'], fmt: (v) => nfmt(v, 2) + '%' },
+    incc: { label: ['INCC', 'INCC'], fmt: (v) => nfmt(v, 2) + '%' },
+    bankRate: { label: ['Bank rate', 'Taxa do banco'], fmt: (v) => nfmt(v, 2) + '%' },
+    tr: { label: ['TR', 'TR'], fmt: (v) => nfmt(v, 2) + L('%/mo', '% a.m.') },
+    commission: { label: ['Broker commission', 'Comissão do corretor'], fmt: (v) => nfmt(v, 2) + '%' },
+    released: { label: ['Released at signing', 'Liberado na assinatura'], fmt: (v) => nfmt(v, 2) + '%' },
+    monthsAfter: { label: ['Months after keys', 'Meses após as chaves'], fmt: (v) => L(`${v} mo`, `${v} meses`) },
+    line: { label: ['Credit line', 'Linha de crédito'], fmt: (v) => v },
+    structure: { label: ['Contract structure', 'Modalidade do contrato'], fmt: (v) => (v === 'associativo' ? 'Associativo' : 'Repasse') },
+  }
+
+  const TEST_NAMES = {
+    t1: ['Test 1: associativo, sale at keys', 'Teste 1: associativo, venda nas chaves'],
+    t2: ['Test 2: repasse na entrega + cessão at keys', 'Teste 2: repasse na entrega + cessão nas chaves'],
+  }
+
+  // ---------- State ----------
+  function sanitize(saved) {
+    const s = { ...D }
+    if (!saved || typeof saved !== 'object') return s
+    for (const k of Object.keys(D)) {
+      if (!(k in saved)) continue
+      const v = saved[k]
+      const def = D[k]
+      if (def === null ? v === null || typeof v === 'number' : typeof v === typeof def) s[k] = v
+    }
+    return s
+  }
+  let state = sanitize(store.get(STORE_KEY))
+  let openState = store.get(OPEN_KEY) || {}
+  let sim = null
+
+  // ---------- Static text + language toggle ----------
+  function renderStatic() {
+    document.documentElement.lang = L('en', 'pt-BR')
+    document.querySelectorAll('[data-i18n]').forEach((el) => {
+      el.textContent = tx(STATIC[el.dataset.i18n])
+    })
+    const ms = $('#monthly > summary')
+    ms.setAttribute('data-show', L('Show', 'Mostrar'))
+    ms.setAttribute('data-hide', L('Hide', 'Ocultar'))
+    $('#inputs').setAttribute('aria-label', L('Inputs', 'Dados'))
+    $('#notes').innerHTML = NOTES[lang]
+    document.querySelectorAll('[data-lang]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.lang === lang)))
+  }
+  document.querySelector('.lang').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-lang]')
+    if (!b || b.dataset.lang === lang) return
+    lang = b.dataset.lang
+    store.set(LANG_KEY, lang)
+    renderStatic()
+    renderInputs()
+    recompute()
+    if (!$('#tests').hidden) renderTests()
+  })
+
+  // ---------- Inputs ----------
+  const inputsEl = $('#inputs')
+  const tipBtn = (id) => `<button type="button" class="tip" aria-expanded="false" aria-controls="${id}" data-tip-for="${id}" aria-label="${L('More information', 'Mais informações')}">i</button>`
+
+  function fieldHtml(f) {
+    if (f.t === 'sub') return `<div class="sub">${esc(tx(f.label))}</div>`
+    if (f.t === 'html') return `<div id="x-${f.id}"></div>`
+    const id = 'f-' + f.k
+    const hint = f.hint ? `<span class="hint">${esc(tx(f.hint))}</span>` : ''
+    const calc = f.calc ? `<span class="calc" id="c-${f.k}"></span>` : ''
+    const wrapAttr = `data-field="${f.k}"`
+    const label = esc(tx(f.label))
+    if (f.t === 'check')
+      return `<label class="check" ${wrapAttr}><input type="checkbox" id="${id}" data-k="${f.k}"><span>${label}</span></label>`
+    if (f.t === 'seg') {
+      const btns = f.opts.map(([v, l]) => `<button type="button" role="radio" data-v="${String(v)}">${esc(tx(l))}</button>`).join('')
+      return `<div class="field${f.wide ? ' wide' : ''}" ${wrapAttr}><span class="label" id="l-${f.k}">${label}</span><div class="seg" role="radiogroup" aria-labelledby="l-${f.k}" data-seg="${f.k}">${btns}</div>${calc}${hint}</div>`
+    }
+    const type = f.t === 'month' ? 'month' : 'text'
+    const mode = f.t === 'int' ? 'numeric' : f.t === 'month' || f.t === 'text' ? 'text' : 'decimal'
+    const pre = f.t === 'money' ? '<span class="pre">R$</span>' : ''
+    const suf = f.suf ? `<span class="suf">${esc(tx(SUF[f.suf]))}</span>` : ''
+    const autoLink = f.auto ? ` <button type="button" class="linkbtn" data-auto="${f.k}" hidden>${L('use auto', 'usar automático')}</button>` : ''
+    return `<div class="field" ${wrapAttr}><label class="label" for="${id}">${label}${autoLink}</label><span class="inbox">${pre}<input id="${id}" data-k="${f.k}" type="${type}" inputmode="${mode}" autocomplete="off" class="${f.t === 'text' ? 'text' : ''}">${suf}</span>${calc}${hint}</div>`
+  }
+
+  function renderInputs() {
+    inputsEl.innerHTML = SECTIONS.map((sec) => {
+      const open = sec.id in openState ? openState[sec.id] : sec.open
+      return `<details class="group" data-sec="${sec.id}"${open ? ' open' : ''}><summary><span>${esc(tx(sec.title))}</span><span class="sum-note" id="sn-${sec.id}"></span></summary><div class="fields">${sec.fields.map(fieldHtml).join('')}</div></details>`
+    }).join('')
+    syncInputs()
+  }
+
+  function display(v, f) {
+    if (v == null) return ''
+    if (f.t === 'money') return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    if (f.t === 'int') return String(v)
+    if (f.t === 'pct') return nfmt(v)
+    return String(v)
+  }
+
+  function syncInputs() {
+    for (const f of Object.values(FIELDS)) {
+      if (f.t === 'seg') {
+        inputsEl.querySelectorAll(`[data-seg="${f.k}"] button`).forEach((b) => b.setAttribute('aria-checked', String(b.dataset.v === String(state[f.k]))))
+        continue
+      }
+      const el = document.getElementById('f-' + f.k)
+      if (!el) continue
+      if (f.t === 'check') el.checked = !!state[f.k]
+      else if (document.activeElement !== el) {
+        el.value = display(state[f.k], f)
+        el.removeAttribute('aria-invalid')
+      }
+    }
+    updateVisibility()
+  }
+
+  function updateVisibility() {
+    for (const f of Object.values(FIELDS)) {
+      const wrap = inputsEl.querySelector(`[data-field="${f.k}"]`)
+      if (wrap) wrap.hidden = f.show ? !f.show(state) : false
+      if (f.auto) {
+        const link = inputsEl.querySelector(`[data-auto="${f.k}"]`)
+        if (link) link.hidden = state[f.k] == null
+      }
+    }
+  }
+
+  const decode = (v) => (v === 'true' ? true : v === 'false' ? false : v)
+
+  inputsEl.addEventListener('input', (e) => {
+    const el = e.target
+    const k = el.dataset && el.dataset.k
+    if (!k) return
+    const f = FIELDS[k]
+    let v
+    if (f.t === 'check') v = el.checked
+    else if (f.t === 'text' || f.t === 'month') {
+      v = el.value
+      if (f.t === 'month' && !/^\d{4}-\d{2}$/.test(v)) return
+    } else {
+      const parsed = parseNum(el.value, f.t === 'money')
+      if (parsed === null) {
+        if (!f.auto) return el.setAttribute('aria-invalid', 'true')
+        v = null
+      } else if (Number.isNaN(parsed) || (f.min != null && parsed < f.min) || (f.t !== 'pct' && parsed < 0)) {
+        return el.setAttribute('aria-invalid', 'true')
+      } else v = f.t === 'int' ? Math.round(parsed) : parsed
+    }
+    el.removeAttribute('aria-invalid')
+    state[k] = v
+    changed()
+  })
+  inputsEl.addEventListener('focusout', (e) => {
+    const el = e.target
+    const k = el.dataset && el.dataset.k
+    if (!k) return
+    const f = FIELDS[k]
+    if (f.t === 'check' || f.t === 'month' || f.t === 'text') return
+    el.value = display(state[k], f)
+    el.removeAttribute('aria-invalid')
+  })
+  inputsEl.addEventListener('click', (e) => {
+    const b = e.target.closest('.seg button')
+    if (b) {
+      const k = b.closest('[data-seg]').dataset.seg
+      state[k] = decode(b.dataset.v)
+      syncInputs()
+      return changed()
+    }
+    const pre = e.target.closest('[data-line]')
+    if (pre) {
+      const name = pre.dataset.line
+      Object.assign(state, { line: name }, E.lineFields(name))
+      syncInputs()
+      return changed()
+    }
+    const a = e.target.closest('[data-auto]')
+    if (a) {
+      state[a.dataset.auto] = null
+      syncInputs()
+      return changed()
+    }
+    const t = e.target.closest('[data-tip-for]')
+    if (t) {
+      const body = document.getElementById(t.dataset.tipFor)
+      if (body) {
+        body.hidden = !body.hidden
+        t.setAttribute('aria-expanded', String(!body.hidden))
+      }
+    }
+  })
+  inputsEl.addEventListener('toggle', (e) => {
+    const d = e.target
+    if (d.dataset && d.dataset.sec) {
+      openState[d.dataset.sec] = d.open
+      store.set(OPEN_KEY, openState)
+    }
+  }, true)
+
+  $('#reset').addEventListener('click', () => {
+    state = { ...D }
+    renderInputs()
+    changed()
+  })
+
+  // ---------- Recompute ----------
+  function changed() {
+    store.set(STORE_KEY, state)
+    updateVisibility()
+    recompute()
+  }
+
+  function recompute() {
+    sim = E.simulate(state)
+    sim.itbiAuto = E.computeItbi({ ...sim.p, itbiOverride: null }, sim.loan).value
+    renderSummary(sim)
+    renderWarnings(sim)
+    renderCalcs(sim)
+    drawCumulative(sim)
+    renderBreakdown(sim)
+    drawTornado(sim, E.tornado(state))
+    renderGrid(sim)
+    renderMonthly(sim)
+    renderBar(sim)
+  }
+
+  // ---------- Summary ----------
+  const winnerText = (buyWins) => (buyWins ? L('Buying', 'Comprar') : L('Fixed income', 'Renda fixa'))
+  function renderSummary(s) {
+    const net = s.at.net
+    const fv = s.fvB
+    const buyWins = s.diff > 0
+    const max = Math.max(net, fv, 1)
+    const w = (v) => Math.max(0, (v / max) * 100)
+    const be = s.breakEven
+    const beText = be.above ? L('Above R$ 5 mi', 'Acima de R$ 5 mi') : be.below ? L('Below R$ 100 mil', 'Abaixo de R$ 100 mil') : brl0(be.value)
+    const beUp = ok(be.value) ? be.value / s.p.price - 1 : null
+    const be0 = s.breakEvenZero.value
+    const realUp = ok(be.value) ? be.value / s.inccPrice - 1 : null
+    const sm = monthLabel(E.monthDate(s.p.startMonth, s.S))
+    $('#summary').innerHTML = `
+      <div class="hero">
+        <div class="hero-head">
+          <p class="eyebrow">${L(`Selling at ${brl0(s.p.salePrice)} in ${sm} (month ${s.S})`, `Vendendo por ${brl0(s.p.salePrice)} em ${sm} (mês ${s.S})`)}</p>
+          <span class="chip"><span class="dot ${buyWins ? 'buy' : 'fi'}"></span>${L(`${winnerText(buyWins)} wins`, `${winnerText(buyWins)} vence`)}</span>
+        </div>
+        <p class="headline">${L(`${winnerText(buyWins)} wins by ${brl0(Math.abs(s.diff))}`, `${winnerText(buyWins)} vence por ${brl0(Math.abs(s.diff))}`)}</p>
+        <div class="vsbars">
+          ${vsRow('buy', L('Net sale proceeds', 'Valor líquido da venda'), net, w(net))}
+          ${vsRow('fi', L('Fixed-income value', 'Valor na renda fixa'), fv, w(fv))}
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat">
+          <span class="k">${L('Break-even resale price', 'Preço de revenda de equilíbrio')}</span>
+          <span class="v">${beText}</span>
+          <span class="s">${L(`<b>${spct(beUp)}</b> over the purchase price`, `<b>${spct(beUp)}</b> sobre o preço de compra`)}</span>
+          <span class="s">${L('With 0% fixed income', 'Com renda fixa a 0%')}: ${brl0(be0)}</span>
+        </div>
+        <div class="stat">
+          <span class="k">${L('Price corrected by INCC only', 'Preço corrigido só pelo INCC')}</span>
+          <span class="v">${brl0(s.inccPrice)}</span>
+          <span class="s">${L('Real appreciation needed above it', 'Valorização real necessária acima dele')}: <b>${spct(realUp)}</b></span>
+        </div>
+        <div class="stat">
+          <span class="k">${L('Flip return per year (IRR)', 'Retorno anual da revenda (TIR)')}</span>
+          <span class="v">${s.irrFlip == null ? '—' : spct(s.irrFlip)}</span>
+          <span class="s">${L('Fixed income', 'Renda fixa')}: <b>${pct(s.irrFi)}</b> ${L('a year', 'ao ano')}${s.p.fiGrossMode ? L(' after IR', ' após IR') : ''}</span>
+          ${s.irrFlip == null ? `<span class="s">${L('No meaningful IRR for these flows.', 'Não há TIR com sentido para esses fluxos.')}</span>` : ''}
+        </div>
+      </div>`
+  }
+  function vsRow(cls, label, v, width) {
+    const inside = width > 55
+    const pos = inside ? `right:calc(${100 - width}% + 8px);color:#fff` : `left:calc(${width}% + 8px)`
+    return `<div class="vsrow"><span class="lab"><span class="dot ${cls}"></span>${label}</span><div class="track"><div class="fill ${cls}" style="width:${width}%"></div><span class="amt" style="${pos}">${brl0(v)}</span></div></div>`
+  }
+
+  function renderBar(s) {
+    const buyWins = s.diff > 0
+    $('#bar-in').innerHTML = `<span>${L('Break-even', 'Equilíbrio')} <b>${s.breakEven.value ? brl0(s.breakEven.value) : '—'}</b></span><span><span class="dot ${buyWins ? 'buy' : 'fi'}"></span> ${L(`<b>${winnerText(buyWins)}</b> wins by`, `<b>${winnerText(buyWins)}</b> vence por`)} <b>${brl0(Math.abs(s.diff))}</b></span>`
+  }
+  try {
+    const io = new IntersectionObserver((entries) => {
+      $('#bar').classList.toggle('show', !entries[0].isIntersecting)
+    })
+    io.observe($('#summary'))
+  } catch (e) { /* no IntersectionObserver: bar stays hidden */ }
+
+  // ---------- Warnings ----------
+  function renderWarnings(s) {
+    const order = { bad: 0, warn: 1, info: 2 }
+    const label = { bad: L('Problem', 'Problema'), warn: L('Check', 'Atenção'), info: L('Note', 'Nota') }
+    const list = [...s.warnings].sort((a, b) => order[a.level] - order[b.level])
+    $('#warnings').innerHTML = list.map((w) => {
+      const text = WARN[w.code] ? WARN[w.code](w.args || {}) : w.code
+      return `<div class="warn ${w.level}"><span class="sev">${label[w.level]}</span><span>${esc(text)}</span></div>`
+    }).join('')
+  }
+
+  // ---------- Inline calculations next to inputs ----------
+  function setHtml(id, html) {
+    const el = document.getElementById(id)
+    if (el) el.innerHTML = html
+  }
+  function renderCalcs(s) {
+    const p = s.p
+    for (const f of Object.values(FIELDS)) {
+      if (!f.auto) continue
+      const el = document.getElementById('f-' + f.k)
+      if (el) el.placeholder = L('auto: ', 'auto: ') + display(f.auto(s), f)
+    }
+    const fpct = p.financed / p.price
+    const over = p.structure === 'associativo' && fpct > s.ltv + 1e-9
+    const fc = document.getElementById('c-financed')
+    if (fc) {
+      fc.className = 'calc' + (over ? ' bad' : '')
+      fc.textContent = L(`${pct(fpct)} of the price · ${s.lineLabel} ${p.system} cap ${pct(s.ltv, 0)}`, `${pct(fpct)} do preço · cota ${s.lineLabel} ${p.system} de ${pct(s.ltv, 0)}`) +
+        (p.structure === 'repasse' && !s.cessao ? L(` · owed at keys ${brl0(s.owedAtKeys)}, bank lends ${brl0(s.loan)}`, ` · devido nas chaves ${brl0(s.owedAtKeys)}, banco financia ${brl0(s.loan)}`) : '')
+    }
+    const nAnnualUsed = Math.min(p.nAnnual, E.parseMonthList(p.annualMonths).length)
+    const off = Math.abs(s.planDiff) > 1
+    setHtml('x-consistency', `<div class="consist">
+      <div><span>${L('Down payment', 'Ato / sinal')}</span><span>${brl(p.downPayment)}</span></div>
+      <div><span>${p.nMonthly} × ${L('monthly', 'mensais')}</span><span>${brl(p.nMonthly * p.monthlyAmt)}</span></div>
+      <div><span>${nAnnualUsed} × ${L('annual', 'anuais')}</span><span>${brl(nAnnualUsed * p.annualAmt)}</span></div>
+      <div><span>${L('Keys payment', 'Parcela das chaves')}</span><span>${brl(p.keysPayment)}</span></div>
+      <div><span>${L('Financed', 'Financiado')}</span><span>${brl(p.financed)}</span></div>
+      <div class="diff${off ? ' off' : ''}"><span>${off ? L('Difference from price', 'Diferença para o preço') : L('Matches the price', 'Bate com o preço')}</span><span>${brl(s.planDiff)}</span></div>
+    </div>`)
+    const ic = document.getElementById('c-itbi')
+    if (ic) {
+      const it = s.cessao ? null : E.computeItbi({ ...p, itbiOverride: null }, s.loan)
+      ic.textContent = s.cessao
+        ? L('Not paid: you exit by cessão de direitos.', 'Não pago: você sai por cessão de direitos.')
+        : it.rule === 'exempt' ? L('Auto: exempt (first property under the ceiling).', 'Auto: isento (primeiro imóvel abaixo do teto).')
+        : it.rule === 'sfh' ? L(`Auto: ${brl(it.value)} = ${nfmt(p.itbiReducedRate)}% on ${brl0(it.reduced)} + ${nfmt(p.itbiRate)}% on ${brl0(it.base - it.reduced)}`, `Auto: ${brl(it.value)} = ${nfmt(p.itbiReducedRate)}% sobre ${brl0(it.reduced)} + ${nfmt(p.itbiRate)}% sobre ${brl0(it.base - it.reduced)}`)
+        : L(`Auto: ${brl(it.value)} = ${nfmt(p.itbiRate)}% on ${brl0(it.base)}`, `Auto: ${brl(it.value)} = ${nfmt(p.itbiRate)}% sobre ${brl0(it.base)}`)
+    }
+    const tc = document.getElementById('c-acqTiming')
+    if (tc) tc.textContent = s.acqMonth == null
+      ? L('Not paid under cessão.', 'Não pagos na cessão.')
+      : L(`Paid at month ${s.acqMonth} (${monthLabel(E.monthDate(p.startMonth, s.acqMonth))}).`, `Pagos no mês ${s.acqMonth} (${monthLabel(E.monthDate(p.startMonth, s.acqMonth))}).`)
+    setHtml('x-presets', `<div class="presets">
+      ${Object.entries(E.LINES).map(([k, l]) => `<button type="button" class="preset" data-line="${k}" aria-pressed="${p.line === k}"><b>${esc(l.label)}</b><span>${nfmt(l.bankRate)}% ${l.rateNominal ? 'nominal' : L('effective', 'efetiva')} + TR · ${L('LTV', 'cota')} ${l.ltvSac}% SAC / ${l.ltvPrice}% PRICE</span></button>`).join('')}
+    </div><span class="hint">${L(`Presets fill the fields below. MCMV Classe Média: family income up to ${brl0(p.mcmvIncomeLimit)}, unit up to ${brl0(p.mcmvPriceLimit)}, first home.`, `Os atalhos preenchem os campos abaixo. MCMV Classe Média: renda familiar até ${brl0(p.mcmvIncomeLimit)}, imóvel até ${brl0(p.mcmvPriceLimit)}, primeiro imóvel.`)}</span>`)
+    const fi = s.firstInstallment
+    setHtml('x-first', fi == null
+      ? `<span class="hint">${L('No bank loan in this scenario.', 'Sem financiamento bancário neste cenário.')}</span>`
+      : `<span class="calc">${L(`First ${p.system} installment ≈ <b>${brl(fi)}</b> on ${brl0(s.loan)} · needs a family income of about ${brl0(fi / 0.3)} (30% rule)`, `Primeira prestação ${p.system} ≈ <b>${brl(fi)}</b> sobre ${brl0(s.loan)} · exige renda familiar de cerca de ${brl0(fi / 0.3)} (regra dos 30%)`)}</span>`)
+    const constrTotal = s.rows.reduce((a, r) => a + (r.t <= s.T + p.averbacaoMonths && r.amort === 0 ? r.intTR + r.ins + r.fee : 0), 0)
+    const tipId = 'tip-constr'
+    const tipWasOpen = document.getElementById(tipId) && !document.getElementById(tipId).hidden
+    setHtml('x-constr', `<div class="field wide"><span class="label">${L('Construction-phase charges (juros de obra)', 'Juros de obra (taxa de evolução de obra)')} ${tipBtn(tipId)}</span>
+      <span class="calc">${p.structure === 'associativo' ? L(`${brl0(constrTotal)} over ${s.constructionMonths} months`, `${brl0(constrTotal)} em ${s.constructionMonths} meses`) : L('None under repasse na entrega.', 'Não há no repasse na entrega.')}</span>
+      <div class="tipbody" id="${tipId}"${tipWasOpen ? '' : ' hidden'}>${L(
+        'Real estate agents often describe this as “insurance, a % of the first installment that rises as the work progresses”. In fact it is the interest and TR on the money Caixa has already released to the builder, plus MIP and DFI insurance and the admin fee. Nothing is amortized, so it rises with each release until the keys.',
+        'Corretores costumam descrever isso como “um seguro, um % da primeira parcela que sobe conforme a obra avança”. Na verdade são os juros e a TR sobre o valor que a Caixa já liberou à construtora, mais os seguros MIP e DFI e a taxa de administração. Não há amortização, então o valor sobe a cada liberação até as chaves.')}</div></div>`)
+    setHtml('x-fi-calc', p.fiGrossMode
+      ? `<span class="calc">${L(`Effective return after IR on these payments: <b>${pct(s.irrFi)}</b> a year. The month-0 payment is held ${E.daysBetween(E.monthDate(p.startMonth, 0), E.monthDate(p.startMonth, s.S))} days.`, `Rentabilidade efetiva após IR sobre esses aportes: <b>${pct(s.irrFi)}</b> ao ano. O aporte do mês 0 fica aplicado por ${E.daysBetween(E.monthDate(p.startMonth, 0), E.monthDate(p.startMonth, s.S))} dias.`)}</span>`
+      : '')
+    setHtml('sn-property', `${brl0(p.price)} · ${s.T} ${L('mo', 'meses')}`)
+    setHtml('sn-bank', `${s.lineLabel} · ${p.structure === 'associativo' ? 'Associativo' : 'Repasse'}`)
+    setHtml('sn-acq', s.cessao ? L('None (cessão)', 'Nenhum (cessão)') : brl0(s.itbi.value + s.registry))
+    setHtml('sn-exit', `${brl0(p.salePrice)} · ${L('month', 'mês')} ${s.S}`)
+    setHtml('sn-fi', p.fiGrossMode ? `${nfmt(p.fiGross)}% ${L('gross', 'bruto')}` : `${nfmt(p.fiNet)}% ${L('net', 'líquido')}`)
+  }
+
+  // ---------- Charts ----------
+  function niceTicks(max, count = 4) {
+    if (max <= 0) return { max: 1, ticks: [0, 1] }
+    const raw = max / count
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)))
+    const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw)
+    const top = Math.ceil(max / step) * step
+    const ticks = []
+    for (let v = 0; v <= top + step / 2; v += step) ticks.push(v)
+    return { max: top, ticks }
+  }
+
+  const tip = $('#tip')
+  function showTip(html, x, y) {
+    tip.innerHTML = html
+    tip.hidden = false
+    const r = tip.getBoundingClientRect()
+    let left = x + 14
+    let top = y + 14
+    if (left + r.width > window.innerWidth - 8) left = x - r.width - 14
+    if (top + r.height > window.innerHeight - 8) top = y - r.height - 14
+    tip.style.left = Math.max(8, left) + 'px'
+    tip.style.top = Math.max(8, top) + 'px'
+  }
+  const hideTip = () => { tip.hidden = true }
+
+  function drawCumulative(s) {
+    const el = $('#chart-cum')
+    const W = Math.max(280, el.clientWidth || 600)
+    const H = W < 520 ? 230 : 290
+    const m = { l: 62, r: 14, t: 14, b: 34 }
+    const pts = s.curve
+    const S = s.S
+    const netPt = s.at.net
+    const { max, ticks } = niceTicks(Math.max(...pts.map((p) => Math.max(p.invested, p.valueB)), netPt > 0 ? netPt : 0))
+    const x = (t) => m.l + (S === 0 ? 0 : (t / S) * (W - m.l - m.r))
+    const y = (v) => m.t + (1 - v / max) * (H - m.t - m.b)
+    const step = S <= 18 ? 3 : S <= 48 ? 6 : 12
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${L('Cumulative cash invested and fixed-income value by month', 'Dinheiro investido acumulado e valor na renda fixa por mês')}">`
+    ticks.forEach((v) => {
+      svg += `<line class="grid" x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}"/>`
+      svg += `<text x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end">${v === 0 ? '0' : short(v)}</text>`
+    })
+    for (let t = 0; t <= S; t += step) svg += `<text x="${x(t)}" y="${H - m.b + 18}" text-anchor="middle">${t}</text>`
+    svg += `<line class="axis" x1="${m.l}" x2="${W - m.r}" y1="${y(0)}" y2="${y(0)}"/>`
+    svg += `<text x="${W - m.r}" y="${H - 2}" text-anchor="end">${L('months from contract', 'meses desde o contrato')}</text>`
+    const path = (key) => pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(1)},${y(p[key]).toFixed(1)}`).join('')
+    svg += `<path class="a-fi" d="${path('valueB')}L${x(S)},${y(0)}L${x(0)},${y(0)}Z"/>`
+    svg += `<path class="l-fi" d="${path('valueB')}"/>`
+    svg += `<path class="l-buy" d="${path('invested')}"/>`
+    if (netPt > 0) {
+      svg += `<circle class="m-buy" cx="${x(S)}" cy="${y(netPt)}" r="6"/>`
+      const ly = y(netPt) + (Math.abs(y(netPt) - y(s.fvB)) < 18 ? (netPt < s.fvB ? 18 : -10) : 4)
+      svg += `<text class="lbl-strong" x="${x(S) - 12}" y="${ly}" text-anchor="end">${L('Net sale proceeds', 'Valor líquido da venda')} ${short(netPt)}</text>`
+    }
+    svg += `<line class="cross" id="cum-cross" x1="0" x2="0" y1="${m.t}" y2="${y(0)}" visibility="hidden"/>`
+    svg += `<circle class="m-fi" id="cum-dfi" r="4.5" visibility="hidden"/><circle class="m-buy" id="cum-dbuy" r="4.5" visibility="hidden"/>`
+    svg += `<rect class="hit" id="cum-hit" x="${m.l}" y="${m.t}" width="${W - m.l - m.r}" height="${H - m.t - m.b}"/>`
+    svg += '</svg>'
+    el.innerHTML = svg
+    $('#cum-legend').innerHTML =
+      `<span><span class="swatch-line" style="background:var(--buy)"></span>${L('Cash invested', 'Dinheiro investido')} <b>${brl0(s.cash)}</b></span>` +
+      `<span><span class="swatch-line" style="background:var(--fi)"></span>${L('Same cash in fixed income', 'Mesmo dinheiro na renda fixa')} <b>${brl0(s.fvB)}</b></span>` +
+      `<span><span class="dot buy"></span>${L('Net sale proceeds', 'Valor líquido da venda')} <b>${brl0(netPt)}</b></span>`
+    const hit = document.getElementById('cum-hit')
+    const cross = document.getElementById('cum-cross')
+    const dfi = document.getElementById('cum-dfi')
+    const dbuy = document.getElementById('cum-dbuy')
+    const svgEl = el.querySelector('svg')
+    const move = (ev) => {
+      const rect = svgEl.getBoundingClientRect()
+      const px = ((ev.clientX - rect.left) / rect.width) * W
+      const t = Math.max(0, Math.min(S, Math.round(((px - m.l) / (W - m.l - m.r)) * S)))
+      const p = pts[t]
+      const row = s.rows[t]
+      for (const [n, v] of [[cross, null], [dfi, p.valueB], [dbuy, p.invested]]) {
+        n.setAttribute('visibility', 'visible')
+        if (v == null) { n.setAttribute('x1', x(t)); n.setAttribute('x2', x(t)) }
+        else { n.setAttribute('cx', x(t)); n.setAttribute('cy', y(v)) }
+      }
+      showTip(`<b>${L('Month', 'Mês')} ${t} · ${monthLabel(row.date)}</b>
+        <div class="row"><span><span class="dot fi"></span>${L('Fixed income', 'Renda fixa')}</span><b>${brl0(p.valueB)}</b></div>
+        <div class="row"><span><span class="dot buy"></span>${L('Cash invested', 'Dinheiro investido')}</span><b>${brl0(p.invested)}</b></div>
+        <div class="row"><span>${L('Paid this month', 'Pago neste mês')}</span><span>${brl0(row.total)}</span></div>`, ev.clientX, ev.clientY)
+    }
+    hit.addEventListener('pointermove', move)
+    hit.addEventListener('pointerdown', move)
+    hit.addEventListener('pointerleave', () => {
+      hideTip()
+      ;[cross, dfi, dbuy].forEach((n) => n.setAttribute('visibility', 'hidden'))
+    })
+  }
+
+  let lastTornado = null
+  function drawTornado(s, tor) {
+    lastTornado = tor
+    const el = $('#chart-tornado')
+    const W = Math.max(280, el.clientWidth || 600)
+    const items = tor.items.filter((it) => it.low != null || it.high != null)
+    const rowH = 46
+    const m = { l: 8, r: 8, t: 30, b: 8 }
+    const H = m.t + items.length * rowH + m.b
+    const vals = items.flatMap((it) => [it.low, it.high]).concat([tor.base, s.p.salePrice]).filter(ok)
+    let lo = Math.min(...vals)
+    let hi = Math.max(...vals)
+    if (hi - lo < 1000) { lo -= 500; hi += 500 }
+    const padL = W < 480 ? 84 : 112
+    const padR = W < 480 ? 84 : 112
+    const x = (v) => m.l + padL + ((v - lo) / (hi - lo)) * (W - m.l - m.r - padL - padR)
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${L('Break-even price sensitivity', 'Sensibilidade do preço de equilíbrio')}">`
+    if (ok(tor.base)) {
+      svg += `<line class="ref" x1="${x(tor.base)}" x2="${x(tor.base)}" y1="${m.t - 6}" y2="${H - m.b}"/>`
+      svg += `<text class="lbl" x="${x(tor.base)}" y="${m.t - 12}" text-anchor="middle">${L('Break-even', 'Equilíbrio')} ${short(tor.base)}</text>`
+    }
+    const sp = s.p.salePrice
+    if (sp >= lo && sp <= hi && Math.abs(x(sp) - x(tor.base)) > 4) {
+      svg += `<line class="ref-buy" x1="${x(sp)}" x2="${x(sp)}" y1="${m.t + 2}" y2="${H - m.b}"/>`
+      if (Math.abs(x(sp) - x(tor.base)) > 120) svg += `<text class="lbl" x="${x(sp)}" y="${m.t - 12}" text-anchor="middle">${L('Your price', 'Seu preço')}</text>`
+    }
+    items.forEach((it, idx) => {
+      const meta = TOR[it.key]
+      const y0 = m.t + idx * rowH
+      const ly = y0 + 30
+      const name = tx(meta.label)
+      svg += `<text class="lbl-strong" x="${m.l}" y="${y0 + 13}">${esc(name)}</text>`
+      const ends = [
+        { v: it.low, setting: meta.fmt(it.lowSet) },
+        { v: it.high, setting: meta.fmt(it.highSet) },
+      ].filter((e) => ok(e.v))
+      if (!ends.length) return
+      const vs = ends.map((e) => e.v)
+      const a = Math.min(...vs, tor.base)
+      const b = Math.max(...vs, tor.base)
+      svg += `<line class="db-line" x1="${x(a)}" x2="${x(b)}" y1="${ly}" y2="${ly}"/>`
+      ends.sort((p, q) => p.v - q.v)
+      const same = ends.length === 2 && Math.abs(ends[0].v - ends[1].v) < 1
+      ends.forEach((e, i) => {
+        const tipText = `<b>${esc(name)}: ${esc(e.setting)}</b><div>${L('Break-even', 'Equilíbrio')} ${brl0(e.v)} (${spct(e.v / tor.base - 1)} ${L('vs current', 'vs atual')})</div>`
+        svg += `<circle class="db-dot" cx="${x(e.v)}" cy="${ly}" r="5.5"/>`
+        svg += `<circle class="hit" cx="${x(e.v)}" cy="${ly}" r="14" data-tip="${esc(tipText)}"/>`
+        if (same && i === 1) return
+        const left = i === 0 && ends.length === 2 ? true : ends.length === 1 ? e.v < tor.base : false
+        const tx2 = left ? x(Math.min(e.v, tor.base)) - 10 : x(Math.max(e.v, tor.base)) + 10
+        const label = same ? `${ends[0].setting} / ${ends[1].setting}` : e.setting
+        svg += `<text x="${tx2}" y="${ly + 4}" text-anchor="${left ? 'end' : 'start'}"><tspan class="lbl">${esc(label)}</tspan> ${short(e.v)}</text>`
+      })
+    })
+    svg += '</svg>'
+    el.innerHTML = svg
+  }
+  document.addEventListener('pointerover', (e) => {
+    const t = e.target.closest && e.target.closest('[data-tip]')
+    if (t) showTip(t.getAttribute('data-tip'), e.clientX, e.clientY)
+  })
+  document.addEventListener('pointerout', (e) => {
+    if (e.target.closest && e.target.closest('[data-tip]')) hideTip()
+  })
+
+  // ---------- Tables ----------
+  function renderBreakdown(s) {
+    const p = s.p
+    const sum = (k) => s.rows.reduce((a, r) => a + r[k], 0)
+    const cell = (v, neg) => (ok(v) && Math.abs(v) > 0.004 ? `<td${neg ? ' class="neg"' : ''}>${neg ? '−' : ''}${brl(Math.abs(v))}</td>` : '<td class="zero">–</td>')
+    const row = (label, oop, sale, cls = '') => `<tr class="${cls}"><td>${label}</td>${cell(oop)}${cell(sale, sale > 0)}</tr>`
+    const sh = sum('shortfall')
+    const taxNote = s.at.exemption === 'reinvest' ? L(' (exempt: reinvestment)', ' (isento: reinvestimento)') : s.at.exemption === 'single' ? L(' (exempt: single property)', ' (isento: imóvel único)') : p.applyFr2 ? ` (FR2 ${nfmt(s.fr2, 4)})` : ''
+    const devSaleLabel = s.cessao
+      ? L('Developer balance assumed by the buyer', 'Saldo da construtora assumido pelo comprador')
+      : p.settleAtSale ? L('Developer balance paid off at sale', 'Saldo da construtora quitado na venda') : L('Developer balance taken over by the buyer', 'Saldo da construtora assumido pelo comprador')
+    $('#breakdown').innerHTML = `<table class="breakdown">
+      <thead><tr><th>${L('Item', 'Item')}</th><th>${L('Out of pocket', 'Do próprio bolso')}</th><th>${L('Settled at sale', 'Acertado na venda')}</th></tr></thead>
+      <tbody>
+        <tr class="sect"><td colspan="3">${L('Before the sale', 'Antes da venda')}</td></tr>
+        ${row(L('Paid to developer (INCC-corrected)', 'Pago à construtora (corrigido pelo INCC)'), sum('dev') + sh, null)}
+        ${sh > 0.5 ? row(L('of which: gap above the bank’s LTV cap, paid at keys', 'dos quais: diferença acima da cota do banco, paga nas chaves'), sh, null, 'indent') : ''}
+        ${row(L('Bank: interest + TR', 'Banco: juros + TR'), sum('intTR'), null)}
+        ${row(L('Bank: insurance (MIP + DFI)', 'Banco: seguros (MIP + DFI)'), sum('ins'), null)}
+        ${row(L('Bank: admin fee', 'Banco: taxa de administração'), sum('fee'), null)}
+        ${row(L('Bank: amortization', 'Banco: amortização'), sum('amort'), null)}
+        ${row('ITBI', sum('itbi'), null)}
+        ${row(L('Registry', 'Registro'), sum('registry'), null)}
+        ${row(L('Appraisal fee', 'Taxa de avaliação'), sum('apprFee'), null)}
+        ${row(L('Condo + IPTU', 'Condomínio + IPTU'), sum('condo'), null)}
+        ${row(L('Total cash invested', 'Total investido'), s.cash, null, 'total')}
+        ${row(L('Opportunity cost (what fixed income would have earned)', 'Custo de oportunidade (o que a renda fixa teria rendido)'), s.fvB - s.cash, null)}
+        ${row(L('Future value of Scenario B (fixed income)', 'Valor futuro do cenário B (renda fixa)'), s.fvB, null, 'total strong')}
+        <tr class="sect"><td colspan="3">${L(`At the sale (month ${s.S})`, `Na venda (mês ${s.S})`)}</td></tr>
+        <tr><td>${L('Sale price', 'Preço de venda')}</td><td class="zero">–</td><td>${brl(s.at.P)}</td></tr>
+        ${row(L(`Broker commission (${nfmt(p.commission)}%)`, `Comissão do corretor (${nfmt(p.commission)}%)`), null, s.at.commission)}
+        ${row(L('Capital gains tax', 'Imposto sobre ganho de capital') + taxNote, null, s.at.tax)}
+        ${s.cessao ? row(L('Financed part assumed by the buyer (INCC-corrected)', 'Parte financiada assumida pelo comprador (corrigida pelo INCC)'), null, s.assumed) : row(L('Bank balance at sale', 'Saldo devedor do banco na venda'), null, s.bankBalance)}
+        ${row(devSaleLabel, null, s.devBalance)}
+        ${row(L('Other exit fees', 'Outros custos de saída') + ' (' + (s.cessao ? L('cessão fee', 'taxa de cessão') : L('lien release', 'baixa da alienação')) + ')', null, s.lien + s.cessaoFee)}
+        <tr class="total strong"><td>${L('Net sale proceeds', 'Valor líquido da venda')}</td><td class="zero">–</td><td>${brl(s.at.net)}</td></tr>
+        <tr class="indent"><td>${L(`Taxable gain ${brl0(s.at.gain)} on a cost basis of ${brl0(s.basisTotal)}`, `Ganho tributável de ${brl0(s.at.gain)} sobre um custo de aquisição de ${brl0(s.basisTotal)}`)}</td><td></td><td></td></tr>
+      </tbody></table>`
+  }
+
+  function renderGrid(s) {
+    const p = s.p
+    const g = E.grid(state)
+    const fiCur = p.fiGrossMode ? p.fiGross : p.fiNet
+    const cell = (v, base) => `<td class="${base ? 'base ' : ''}${ok(v) && v <= p.salePrice ? 'win' : ''}">${ok(v) ? brl0(v) : '> R$ 5 mi'}</td>`
+    const fiKind = p.fiGrossMode ? L('gross', 'bruta') : L('net', 'líquida')
+    $('#grid').innerHTML = `
+      <div class="tablewrap"><table class="gridtable">
+        <thead><tr><th>${L(`INCC ↓ · ${fiKind} fixed income →`, `INCC ↓ · renda fixa ${fiKind} →`)}</th>${g.fi.map((f) => `<th>${f}%</th>`).join('')}</tr></thead>
+        <tbody>${g.incc.map((ic, r) => `<tr><td>INCC ${ic}%</td>${g.cells[r].map((v, c) => cell(v, ic === p.incc && g.fi[c] === fiCur)).join('')}</tr>`).join('')}</tbody>
+      </table></div>
+      <div class="tablewrap"><table class="gridtable">
+        <thead><tr><th>${L('Bank rate', 'Taxa do banco')} (${p.rateNominal ? 'nominal' : L('effective', 'efetiva')})</th>${g.bankRates.map((b) => `<th>${b.rate}%</th>`).join('')}<th>SAC</th><th>PRICE</th></tr></thead>
+        <tbody><tr><td>${L('Break-even', 'Equilíbrio')}</td>${g.bankRates.map((b) => cell(b.value, b.rate === p.bankRate)).join('')}${g.systems.map((x) => cell(x.value, x.system === p.system)).join('')}</tr></tbody>
+      </table></div>
+      <p class="gridnote">${L(
+        `Outlined: your current inputs. ✓ in green: break-even at or below your expected sale price of ${brl0(p.salePrice)}, so buying wins. SAC vs PRICE only changes the result when you hold after the keys or under repasse (it changes the LTV cap).`,
+        `Contornado: seus dados atuais. ✓ em verde: equilíbrio igual ou abaixo do seu preço de venda esperado de ${brl0(p.salePrice)}, então comprar vence. SAC x PRICE só muda o resultado quando você fica com o imóvel após as chaves ou no repasse (muda a cota máxima).`)}</p>`
+  }
+
+  function renderMonthly(s) {
+    const cell = (v) => (Math.abs(v) > 0.004 ? `<td>${brl(v)}</td>` : '<td class="zero">–</td>')
+    const tot = { dev: 0, bank: 0, acq: 0, condo: 0, total: 0, fv: 0, opp: 0 }
+    const body = s.rows.map((r) => {
+      tot.dev += r.devTotal; tot.bank += r.bank; tot.acq += r.acq; tot.condo += r.condo; tot.total += r.total; tot.fv += r.fv; tot.opp += r.opp
+      const tag = r.t === s.T ? L(' · keys', ' · chaves') : ''
+      const sale = r.t === s.S && s.S !== s.T ? L(' · sale', ' · venda') : ''
+      return `<tr><td>${r.t}${tag}${sale}</td><td>${monthLabel(r.date)}</td>${cell(r.devTotal)}${cell(r.bank)}${cell(r.acq)}${cell(r.condo)}${cell(r.total)}${cell(r.fv)}${cell(r.opp)}</tr>`
+    }).join('')
+    $('#monthly-table').innerHTML = `<table class="monthly-table">
+      <thead><tr><th>${L('Month', 'Mês')}</th><th>${L('Date', 'Data')}</th><th>${L('Developer', 'Construtora')}</th><th>${L('Bank charges', 'Encargos do banco')}</th><th>${L('Acquisition', 'Aquisição')}</th><th>${L('Other (condo, IPTU)', 'Outros (condomínio, IPTU)')}</th><th>${L('Total out', 'Total pago')}</th><th>${L('Value at sale month', 'Valor no mês da venda')}</th><th>${L('Opportunity cost', 'Custo de oportunidade')}</th></tr></thead>
+      <tbody>${body}<tr class="total"><td>${L('Total', 'Total')}</td><td></td>${cell(tot.dev)}${cell(tot.bank)}${cell(tot.acq)}${cell(tot.condo)}${cell(tot.total)}${cell(tot.fv)}${cell(tot.opp)}</tr></tbody></table>`
+  }
+
+  // ---------- Tests ----------
+  const CHECK_NAMES = {
+    cash: ['Cash invested', 'Total investido'],
+    fvB: ['Scenario B', 'Cenário B'],
+    devBalance: ['Developer balance', 'Saldo da construtora'],
+    assumed: ['Balance assumed', 'Saldo assumido'],
+    cessaoFee: ['Cessão fee', 'Taxa de cessão'],
+    breakEven: ['Break-even', 'Equilíbrio'],
+  }
+  function renderTests() {
+    const box = $('#tests')
+    const results = E.runTests()
+    box.hidden = false
+    box.innerHTML = results.map((r, i) => `
+      <div class="panel" style="margin-top:8px">
+        <h2>${esc(tx(TEST_NAMES[r.id]) || r.name)} · <span class="${r.pass ? 'pass' : 'fail'}">${r.pass ? L('PASS', 'OK') : L('FAIL', 'FALHOU')}</span></h2>
+        <div class="tablewrap"><table><thead><tr><th>${L('Check', 'Verificação')}</th><th>${L('Expected', 'Esperado')}</th><th>${L('Got', 'Obtido')}</th><th>${L('Result', 'Resultado')}</th></tr></thead><tbody>
+        ${r.checks.map((c) => `<tr><td>${esc(tx(CHECK_NAMES[c.key]) || c.key)}</td><td>${brl0(c.expected)}</td><td>${brl(c.got)}</td><td class="${c.pass ? 'pass' : 'fail'}">${c.pass ? L('pass', 'ok') : L('fail', 'falhou')}</td></tr>`).join('')}
+        </tbody></table></div>
+        <div><button type="button" class="btn" data-load-test="${i}">${L('Load these inputs', 'Carregar estes dados')}</button></div>
+      </div>`).join('') + `<p class="hint">${L('Tolerance ± R$ 500. Loading a test replaces your inputs; use Reset to go back to the defaults.', 'Tolerância de ± R$ 500. Carregar um teste substitui seus dados; use Restaurar padrões para voltar.')}</p>`
+  }
+  $('#run-tests').addEventListener('click', renderTests)
+  $('#tests').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-load-test]')
+    if (!b) return
+    state = { ...E.TESTS[+b.dataset.loadTest].inputs }
+    renderInputs()
+    changed()
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  })
+
+  // ---------- Resize ----------
+  let rz = null
+  const redraw = () => {
+    if (!sim) return
+    drawCumulative(sim)
+    if (lastTornado) drawTornado(sim, lastTornado)
+  }
+  try {
+    const ro = new ResizeObserver(() => { clearTimeout(rz); rz = setTimeout(redraw, 80) })
+    ro.observe($('#chart-cum'))
+  } catch (e) {
+    window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(redraw, 80) })
+  }
+
+  renderStatic()
+  renderInputs()
+  recompute()
+})()
+</script>

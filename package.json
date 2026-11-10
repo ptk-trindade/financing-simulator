@@ -1,0 +1,10 @@
+{
+  "name": "na-planta-flip",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "node simulator/build.mjs",
+    "test": "node simulator/test.mjs"
+  }
+}
