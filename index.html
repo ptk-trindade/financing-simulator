@@ -161,6 +161,24 @@ button { font: inherit; color: inherit; }
 .consist .diff { font-weight: 600; border-top: 1px solid var(--line); padding-top: 3px; margin-top: 2px; }
 .consist .diff.off { color: var(--bad); }
 
+/* ---------- Saved simulations ---------- */
+.save-form { display: flex; gap: 8px; }
+.save-form .inbox { flex: 1; }
+.save-form .btn { padding: 6px 12px; }
+.btn:disabled { opacity: 0.5; cursor: default; border-color: var(--line-2); }
+.btn.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.save-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.save-row { display: flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 7px; padding: 2px 4px 2px 10px; background: var(--surface-2); min-width: 0; }
+.save-row.current { border-color: var(--buy); background: var(--buy-soft); }
+.save-row .name { flex: 1; min-width: 0; text-align: left; border: 0; background: none; cursor: pointer; padding: 5px 0; display: flex; gap: 8px; align-items: baseline; }
+.save-row .name span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.save-row .tag { font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
+.save-row .rename { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--buy); border-radius: 5px; padding: 3px 6px; margin: 2px 0; outline: none; }
+.icon-btn { border: 0; background: none; cursor: pointer; color: var(--muted); padding: 5px 7px; border-radius: 5px; font-size: 0.9rem; line-height: 1; white-space: nowrap; }
+.icon-btn:hover { color: var(--ink); background: var(--surface); }
+.icon-btn.on { color: var(--warn); }
+.icon-btn.armed { color: var(--bad); font-size: 0.78rem; font-weight: 600; }
+
 /* ---------- Panels ---------- */
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
 .panel > *, .hero > * { min-width: 0; }
@@ -332,8 +350,11 @@ td.neg { color: var(--ink-2); }
     MCMV: { label: 'MCMV Classe Média', bankRate: 10.0, rateNominal: true, ltvSac: 90, ltvPrice: 80 },
   }
 
-  /** null on an "auto" field means: derive it from other inputs. */
-  const DEFAULTS = Object.freeze({
+  /**
+   * The worked example from the spec. The reference tests run on it, so keep these values fixed.
+   * null on an "auto" field means: derive it from other inputs.
+   */
+  const SPEC_EXAMPLE = Object.freeze({
     // 2.1 Property and developer payment plan
     price: 389900,
     monthsToKeys: 24,
@@ -404,6 +425,27 @@ td.neg { color: var(--ink-2); }
     fiExempt: false,
     // Calendar
     startMonth: '2026-12',
+  })
+
+  /** What a new visitor sees: round numbers that add up, starting this month. */
+  const thisMonth = () => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  }
+  const DEFAULTS = Object.freeze({
+    ...SPEC_EXAMPLE,
+    price: 400000,
+    downPayment: 20000,
+    nMonthly: 36,
+    monthlyAmt: 1500,
+    nAnnual: 3,
+    annualAmt: 5000,
+    annualMonths: '12, 24, 36',
+    keysPayment: 11000,
+    financed: 300000, // 75% of the price, under the SBPE SAC cap
+    registry: 6500,
+    salePrice: 480000,
+    startMonth: thisMonth(),
   })
 
   const num = (v, fallback = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback)
@@ -869,7 +911,7 @@ td.neg { color: var(--ink-2); }
   // ---------------------------------------------------------------------------------
   // Test cases (section 6 of the spec)
   const TEST1_INPUTS = {
-    ...DEFAULTS,
+    ...SPEC_EXAMPLE,
     structure: 'associativo',
     exitType: 'sale',
     monthsAfterKeys: 0,
@@ -936,7 +978,7 @@ td.neg { color: var(--ink-2); }
   }
 
   root.OffplanEngine = {
-    DEFAULTS, LINES, TESTS, eff, irRate, monthDate, daysBetween, parseMonthList, computeItbi,
+    DEFAULTS, SPEC_EXAMPLE, LINES, TESTS, eff, irRate, monthDate, daysBetween, parseMonthList, computeItbi,
     build, simulate, breakEven, irr, tornado, grid, lineFields, runTests,
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this)
@@ -1005,6 +1047,7 @@ td.neg { color: var(--ink-2); }
     title: ['Buy off-plan and resell at the keys, or keep the money in fixed income?', 'Comprar na planta e revender na entrega das chaves, ou deixar o dinheiro na renda fixa?'],
     subtitle: ['Every number updates as you type. Your inputs are saved in this browser.', 'Os números se atualizam enquanto você digita. Seus dados ficam salvos neste navegador.'],
     reset: ['Reset to defaults', 'Restaurar padrões'],
+    resetMine: ['Reset to my default', 'Restaurar meu padrão'],
     cumTitle: ['Cash in vs the fixed-income alternative', 'Dinheiro investido x alternativa em renda fixa'],
     cumIntro: [
       'Blue is what you have paid out of pocket so far. Orange is what the same payments would be worth if they had stayed in fixed income. The dot is what you keep after selling at your expected price.',
@@ -1266,7 +1309,24 @@ td.neg { color: var(--ink-2); }
     }
     return s
   }
-  let state = sanitize(store.get(STORE_KEY))
+  // Named saves: { list: [{ id, name, inputs, at }], defaultId, currentId }
+  const SAVES_KEY = 'financing-simulator:saves:v1'
+  const saves = (() => {
+    const raw = store.get(SAVES_KEY)
+    const list = raw && Array.isArray(raw.list)
+      ? raw.list.filter((x) => x && typeof x.id === 'string' && typeof x.name === 'string' && x.inputs && typeof x.inputs === 'object')
+      : []
+    const has = (id) => list.some((x) => x.id === id)
+    return { list, defaultId: has(raw && raw.defaultId) ? raw.defaultId : null, currentId: has(raw && raw.currentId) ? raw.currentId : null }
+  })()
+  const findSave = (id) => saves.list.find((x) => x.id === id) || null
+  const findByName = (name) => saves.list.find((x) => x.name.toLowerCase() === name.trim().toLowerCase()) || null
+  const persistSaves = () => store.set(SAVES_KEY, saves)
+
+  const working = store.get(STORE_KEY)
+  const mine = findSave(saves.defaultId)
+  let state = working ? sanitize(working) : mine ? sanitize(mine.inputs) : { ...D }
+  if (!working && mine) saves.currentId = mine.id
   let openState = store.get(OPEN_KEY) || {}
   let sim = null
 
@@ -1282,6 +1342,10 @@ td.neg { color: var(--ink-2); }
     $('#inputs').setAttribute('aria-label', L('Inputs', 'Dados'))
     $('#notes').innerHTML = NOTES[lang]
     document.querySelectorAll('[data-lang]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.lang === lang)))
+    renderResetLabel()
+  }
+  function renderResetLabel() {
+    $('#reset').textContent = tx(findSave(saves.defaultId) ? STATIC.resetMine : STATIC.reset)
   }
   document.querySelector('.lang').addEventListener('click', (e) => {
     const b = e.target.closest('[data-lang]')
@@ -1320,12 +1384,76 @@ td.neg { color: var(--ink-2); }
     return `<div class="field" ${wrapAttr}><label class="label" for="${id}">${label}${autoLink}</label><span class="inbox">${pre}<input id="${id}" data-k="${f.k}" type="${type}" inputmode="${mode}" autocomplete="off" class="${f.t === 'text' ? 'text' : ''}">${suf}</span>${calc}${hint}</div>`
   }
 
+  function savesCardHtml() {
+    const open = 'saves' in openState ? openState.saves : true
+    const cur = findSave(saves.currentId)
+    return `<details class="group" data-sec="saves"${open ? ' open' : ''}>
+      <summary><span>${L('My simulations', 'Minhas simulações')}</span><span class="sum-note" id="sn-saves"></span></summary>
+      <div class="fields">
+        <form class="save-form" id="save-form" autocomplete="off">
+          <span class="inbox"><input id="save-name" class="text" maxlength="60" aria-label="${L('Name for this simulation', 'Nome desta simulação')}" placeholder="${L('Name, e.g. Pinheiros 2BR', 'Nome, ex.: Pinheiros 2 dorms')}" value="${cur ? esc(cur.name) : ''}"></span>
+          <button type="submit" class="btn primary" id="save-btn"></button>
+        </form>
+        <ul class="save-list" id="save-list"></ul>
+        <span class="hint" id="save-hint"></span>
+        <div><button type="button" class="linkbtn" id="load-standard">${L('Load the standard example values', 'Carregar os valores padrão de exemplo')}</button></div>
+      </div>
+    </details>`
+  }
+
+  function renderSaves() {
+    const cur = findSave(saves.currentId)
+    const edited = !!cur && JSON.stringify(sanitize(cur.inputs)) !== JSON.stringify(state)
+    const sn = $('#sn-saves')
+    if (sn) sn.textContent = cur ? cur.name + (edited ? ' · ' + L('edited', 'alterado') : '') : L('not saved', 'não salvo')
+    const list = $('#save-list')
+    if (!list) return
+    list.hidden = !saves.list.length
+    list.innerHTML = saves.list.map((x) => {
+      const isCur = x.id === saves.currentId
+      const isDef = x.id === saves.defaultId
+      const tags = [isDef ? L('default', 'padrão') : '', isCur && edited ? L('edited', 'alterado') : ''].filter(Boolean).join(' · ')
+      return `<li class="save-row${isCur ? ' current' : ''}" data-id="${x.id}">
+        <button type="button" class="name" data-act="load" title="${L('Load', 'Carregar')}"><span>${esc(x.name)}</span>${tags ? `<span class="tag">${tags}</span>` : ''}</button>
+        <button type="button" class="icon-btn${isDef ? ' on' : ''}" data-act="default" aria-pressed="${isDef}" title="${L('Use as my default', 'Usar como meu padrão')}" aria-label="${L('Use as my default', 'Usar como meu padrão')}">${isDef ? '★' : '☆'}</button>
+        <button type="button" class="icon-btn" data-act="rename" title="${L('Rename', 'Renomear')}" aria-label="${L('Rename', 'Renomear')}">✎</button>
+        <button type="button" class="icon-btn" data-act="delete" title="${L('Delete', 'Excluir')}" aria-label="${L('Delete', 'Excluir')}">✕</button>
+      </li>`
+    }).join('')
+    $('#save-hint').textContent = saves.list.length
+      ? L('Click a name to load it. ★ marks your default, which Reset goes back to. Saving under an existing name updates it.',
+          'Clique num nome para carregar. ★ marca o seu padrão, para onde o botão Restaurar volta. Salvar com um nome que já existe atualiza a simulação.')
+      : L('Name your inputs to save them and come back later. Saves stay in this browser on this device.',
+          'Dê um nome aos seus dados para salvá-los e voltar depois. As simulações ficam salvas neste navegador, neste aparelho.')
+    renderSaveBtn()
+    renderResetLabel()
+  }
+
+  function renderSaveBtn() {
+    const input = $('#save-name')
+    const btn = $('#save-btn')
+    if (!input || !btn) return
+    const name = input.value.trim()
+    btn.disabled = !name
+    btn.textContent = name && findByName(name) ? L('Update', 'Atualizar') : L('Save', 'Salvar')
+  }
+
   function renderInputs() {
-    inputsEl.innerHTML = SECTIONS.map((sec) => {
+    inputsEl.innerHTML = savesCardHtml() + SECTIONS.map((sec) => {
       const open = sec.id in openState ? openState[sec.id] : sec.open
       return `<details class="group" data-sec="${sec.id}"${open ? ' open' : ''}><summary><span>${esc(tx(sec.title))}</span><span class="sum-note" id="sn-${sec.id}"></span></summary><div class="fields">${sec.fields.map(fieldHtml).join('')}</div></details>`
     }).join('')
     syncInputs()
+    renderSaves()
+  }
+
+  /** Replace all inputs at once (loading a save, reset, a test case). */
+  function loadState(inputs, saveId) {
+    state = sanitize(inputs)
+    saves.currentId = saveId || null
+    persistSaves()
+    renderInputs()
+    changed()
   }
 
   function display(v, f) {
@@ -1437,15 +1565,108 @@ td.neg { color: var(--ink-2); }
   }, true)
 
   $('#reset').addEventListener('click', () => {
-    state = { ...D }
-    renderInputs()
-    changed()
+    const mineNow = findSave(saves.defaultId)
+    if (mineNow) loadState(mineNow.inputs, mineNow.id)
+    else loadState(D, null)
+  })
+
+  // ---------- Saved simulations ----------
+  inputsEl.addEventListener('input', (e) => {
+    if (e.target.id === 'save-name') renderSaveBtn()
+  })
+  inputsEl.addEventListener('submit', (e) => {
+    if (e.target.id !== 'save-form') return
+    e.preventDefault()
+    const input = $('#save-name')
+    const name = input.value.trim().slice(0, 60)
+    if (!name) return
+    let item = findByName(name)
+    if (item) Object.assign(item, { name, inputs: { ...state }, at: Date.now() })
+    else {
+      item = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, inputs: { ...state }, at: Date.now() }
+      saves.list.push(item)
+    }
+    saves.currentId = item.id
+    persistSaves()
+    input.value = name
+    renderSaves()
+    const btn = $('#save-btn')
+    btn.textContent = L('Saved ✓', 'Salvo ✓')
+    setTimeout(renderSaveBtn, 1400)
+  })
+
+  let armedDelete = null
+  let armTimer = null
+  inputsEl.addEventListener('click', (e) => {
+    if (e.target.id === 'load-standard') return loadState(D, null)
+    const b = e.target.closest('[data-act]')
+    if (!b) return
+    const row = b.closest('[data-id]')
+    const item = findSave(row.dataset.id)
+    if (!item) return
+    const act = b.dataset.act
+    if (act === 'load') return loadState(item.inputs, item.id)
+    if (act === 'default') {
+      saves.defaultId = saves.defaultId === item.id ? null : item.id
+      persistSaves()
+      return renderSaves()
+    }
+    if (act === 'delete') {
+      if (armedDelete !== item.id) {
+        armedDelete = item.id
+        b.textContent = L('Delete?', 'Excluir?')
+        b.classList.add('armed')
+        clearTimeout(armTimer)
+        armTimer = setTimeout(() => { armedDelete = null; renderSaves() }, 3000)
+        return
+      }
+      armedDelete = null
+      clearTimeout(armTimer)
+      saves.list = saves.list.filter((x) => x.id !== item.id)
+      if (saves.defaultId === item.id) saves.defaultId = null
+      if (saves.currentId === item.id) {
+        saves.currentId = null
+        $('#save-name').value = ''
+      }
+      persistSaves()
+      return renderSaves()
+    }
+    if (act === 'rename') {
+      const nameBtn = row.querySelector('.name')
+      const field = document.createElement('input')
+      field.className = 'rename'
+      field.maxLength = 60
+      field.value = item.name
+      field.setAttribute('aria-label', L('New name', 'Novo nome'))
+      nameBtn.replaceWith(field)
+      field.focus()
+      field.select()
+      let done = false
+      const finish = (commit) => {
+        if (done) return
+        done = true
+        const name = field.value.trim().slice(0, 60)
+        const clash = findByName(name)
+        if (commit && name && (!clash || clash === item)) {
+          item.name = name
+          persistSaves()
+          if (saves.currentId === item.id) $('#save-name').value = name
+        }
+        renderSaves()
+      }
+      field.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') { ev.preventDefault(); finish(true) }
+        if (ev.key === 'Escape') finish(false)
+      })
+      field.addEventListener('blur', () => finish(true))
+    }
   })
 
   // ---------- Recompute ----------
   function changed() {
     store.set(STORE_KEY, state)
     updateVisibility()
+    renderSaves()
     recompute()
   }
 
@@ -1863,9 +2084,7 @@ td.neg { color: var(--ink-2); }
   $('#tests').addEventListener('click', (e) => {
     const b = e.target.closest('[data-load-test]')
     if (!b) return
-    state = { ...E.TESTS[+b.dataset.loadTest].inputs }
-    renderInputs()
-    changed()
+    loadState(E.TESTS[+b.dataset.loadTest].inputs, null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   })
 

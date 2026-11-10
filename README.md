@@ -19,6 +19,8 @@ The headline is the difference between the two. The page also shows:
 - a sensitivity chart and grid showing which inputs move the result most
 - warnings for things to check, such as LTV caps, MCMV limits and installments that run past the sale
 
+You can save your inputs under a name ("Pinheiros 2BR", "Vila Mariana 3BR") and load, update, rename or delete them later. Mark one with ★ to make it your default: the Reset button goes back to it. Saves live in your browser's local storage, so they stay on that device and browser only.
+
 It covers the associativo and repasse structures, SBPE and MCMV credit lines, SAC and PRICE amortization, and selling either by deed or by cessão de direitos.
 
 ## Run it
@@ -34,7 +36,7 @@ npm test        # runs the reference test cases against the calculation engine
 
 ## Files
 
-- `simulator/engine.js` holds all the calculations, with no DOM code. It runs in the browser and in Node.
+- `simulator/engine.js` holds all the calculations, with no DOM code. It runs in the browser and in Node. `DEFAULTS` are the round example values a new visitor sees; `SPEC_EXAMPLE` is the worked example the reference tests run on.
 - `simulator/app.html` is the page template: inputs, charts, tables and the English/Portuguese text.
 - `simulator/build.mjs` inlines the engine into the template and writes the finished pages.
 - `simulator/test.mjs` runs the two reference cases and extra checks.

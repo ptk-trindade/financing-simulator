@@ -14,8 +14,11 @@
     MCMV: { label: 'MCMV Classe Média', bankRate: 10.0, rateNominal: true, ltvSac: 90, ltvPrice: 80 },
   }
 
-  /** null on an "auto" field means: derive it from other inputs. */
-  const DEFAULTS = Object.freeze({
+  /**
+   * The worked example from the spec. The reference tests run on it, so keep these values fixed.
+   * null on an "auto" field means: derive it from other inputs.
+   */
+  const SPEC_EXAMPLE = Object.freeze({
     // 2.1 Property and developer payment plan
     price: 389900,
     monthsToKeys: 24,
@@ -86,6 +89,27 @@
     fiExempt: false,
     // Calendar
     startMonth: '2026-12',
+  })
+
+  /** What a new visitor sees: round numbers that add up, starting this month. */
+  const thisMonth = () => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  }
+  const DEFAULTS = Object.freeze({
+    ...SPEC_EXAMPLE,
+    price: 400000,
+    downPayment: 20000,
+    nMonthly: 36,
+    monthlyAmt: 1500,
+    nAnnual: 3,
+    annualAmt: 5000,
+    annualMonths: '12, 24, 36',
+    keysPayment: 11000,
+    financed: 300000, // 75% of the price, under the SBPE SAC cap
+    registry: 6500,
+    salePrice: 480000,
+    startMonth: thisMonth(),
   })
 
   const num = (v, fallback = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback)
@@ -551,7 +575,7 @@
   // ---------------------------------------------------------------------------------
   // Test cases (section 6 of the spec)
   const TEST1_INPUTS = {
-    ...DEFAULTS,
+    ...SPEC_EXAMPLE,
     structure: 'associativo',
     exitType: 'sale',
     monthsAfterKeys: 0,
@@ -618,7 +642,7 @@
   }
 
   root.OffplanEngine = {
-    DEFAULTS, LINES, TESTS, eff, irRate, monthDate, daysBetween, parseMonthList, computeItbi,
+    DEFAULTS, SPEC_EXAMPLE, LINES, TESTS, eff, irRate, monthDate, daysBetween, parseMonthList, computeItbi,
     build, simulate, breakEven, irr, tornado, grid, lineFields, runTests,
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this)
