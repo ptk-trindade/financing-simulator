@@ -2,7 +2,7 @@
 
 Should you buy an off-plan apartment in São Paulo (imóvel na planta) and resell it when you get the keys, or keep the same money in fixed income? This calculator answers that month by month.
 
-**Live page:** https://ptk-trindade.github.io/financing-simualtor/
+**Live page:** https://ptk-trindade.github.io/financing-simulator/
 
 It runs entirely in the browser. There is no back end and nothing to install. The interface is available in English and Portuguese.
 
