@@ -171,12 +171,14 @@ button { font: inherit; color: inherit; }
 .save-row { display: flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 7px; padding: 2px 4px 2px 10px; background: var(--surface-2); min-width: 0; }
 .save-row.current { border-color: var(--buy); background: var(--buy-soft); }
 .save-row .name { flex: 1; min-width: 0; text-align: left; border: 0; background: none; cursor: pointer; padding: 5px 0; display: flex; gap: 8px; align-items: baseline; }
-.save-row .name span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-.save-row .tag { font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
+.save-row .name span:first-child { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.save-row .tag { flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
 .save-row .rename { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--buy); border-radius: 5px; padding: 3px 6px; margin: 2px 0; outline: none; }
 .icon-btn { border: 0; background: none; cursor: pointer; color: var(--muted); padding: 5px 7px; border-radius: 5px; font-size: 0.9rem; line-height: 1; white-space: nowrap; }
 .icon-btn:hover { color: var(--ink); background: var(--surface); }
 .icon-btn.on { color: var(--warn); }
+.btn.mini { padding: 3px 9px; font-size: 0.78rem; margin-right: 2px; }
+.save-row.dirty .tag { color: var(--warn); }
 .icon-btn.armed { color: var(--bad); font-size: 0.78rem; font-weight: 600; }
 
 /* ---------- Panels ---------- */
@@ -1308,8 +1310,9 @@ td.neg { color: var(--ink-2); }
     }
     return s
   }
-  // Simulations: { draft: inputs, list: [{ id, name, inputs, at }], defaultId, currentId }
-  // currentId null means the Draft is selected. Edits save automatically to whichever is selected.
+  // Simulations: { draft: inputs, list: [{ id, name, inputs, at }], pending: { id: inputs }, defaultId, currentId }
+  // currentId null means the Draft is open. The Draft saves as you type; a named simulation only
+  // changes when its Save button is clicked. Until then its edits sit in `pending`.
   const SAVES_KEY = 'financing-simulator:saves:v1'
   const saves = (() => {
     const raw = store.get(SAVES_KEY)
@@ -1320,7 +1323,11 @@ td.neg { color: var(--ink-2); }
     const defaultId = has(raw && raw.defaultId) ? raw.defaultId : null
     const mine = list.find((x) => x.id === defaultId)
     const draft = raw && raw.draft && typeof raw.draft === 'object' ? sanitize(raw.draft) : sanitize(mine ? mine.inputs : D)
-    return { draft, list, defaultId, currentId: has(raw && raw.currentId) ? raw.currentId : null }
+    const pending = {}
+    if (raw && raw.pending && typeof raw.pending === 'object') {
+      for (const [id, v] of Object.entries(raw.pending)) if (has(id) && v && typeof v === 'object') pending[id] = sanitize(v)
+    }
+    return { draft, list, pending, defaultId, currentId: has(raw && raw.currentId) ? raw.currentId : null }
   })()
   const findSave = (id) => saves.list.find((x) => x.id === id) || null
   const DRAFT_NAMES = ['draft', 'rascunho']
@@ -1331,7 +1338,7 @@ td.neg { color: var(--ink-2); }
   const persistSaves = () => store.set(SAVES_KEY, saves)
 
   const cur0 = findSave(saves.currentId)
-  let state = sanitize(cur0 ? cur0.inputs : saves.draft)
+  let state = sanitize(cur0 ? saves.pending[cur0.id] || cur0.inputs : saves.draft)
   let openState = store.get(OPEN_KEY) || {}
   let sim = null
 
@@ -1409,7 +1416,7 @@ td.neg { color: var(--ink-2); }
   function renderSaves() {
     const cur = findSave(saves.currentId)
     const sn = $('#sn-saves')
-    if (sn) sn.textContent = cur ? cur.name : draftName()
+    if (sn) sn.textContent = cur ? cur.name + (saves.pending[cur.id] ? ' · ' + L('unsaved', 'não salvo') : '') : draftName()
     const list = $('#save-list')
     if (!list) return
     const draftRow = `<li class="save-row draft${cur ? '' : ' current'}" data-draft>
@@ -1419,16 +1426,23 @@ td.neg { color: var(--ink-2); }
     list.innerHTML = draftRow + saves.list.map((x) => {
       const isCur = x.id === saves.currentId
       const isDef = x.id === saves.defaultId
-      return `<li class="save-row${isCur ? ' current' : ''}" data-id="${x.id}">
-        <button type="button" class="name" data-act="load" title="${L('Open', 'Abrir')}"><span>${esc(x.name)}</span>${isDef ? `<span class="tag">${L('default', 'padrão')}</span>` : ''}</button>
+      const dirty = !!saves.pending[x.id]
+      const tags = [isDef ? L('default', 'padrão') : '', dirty ? L('unsaved', 'não salvo') : ''].filter(Boolean).join(' · ')
+      const dirtyBtns = dirty
+        ? `<button type="button" class="btn primary mini" data-act="save" title="${L('Save the changes to this simulation', 'Salvar as alterações nesta simulação')}">${L('Save', 'Salvar')}</button>
+           <button type="button" class="icon-btn" data-act="discard" title="${L('Discard changes', 'Descartar alterações')}" aria-label="${L('Discard changes', 'Descartar alterações')}">↺</button>`
+        : ''
+      return `<li class="save-row${isCur ? ' current' : ''}${dirty ? ' dirty' : ''}" data-id="${x.id}">
+        <button type="button" class="name" data-act="load" title="${L('Open', 'Abrir')}"><span>${esc(x.name)}</span>${tags ? `<span class="tag">${tags}</span>` : ''}</button>
+        ${dirtyBtns}
         <button type="button" class="icon-btn${isDef ? ' on' : ''}" data-act="default" aria-pressed="${isDef}" title="${L('Use as my default', 'Usar como meu padrão')}" aria-label="${L('Use as my default', 'Usar como meu padrão')}">${isDef ? '★' : '☆'}</button>
         <button type="button" class="icon-btn" data-act="rename" title="${L('Rename', 'Renomear')}" aria-label="${L('Rename', 'Renomear')}">✎</button>
         <button type="button" class="icon-btn" data-act="delete" title="${L('Delete', 'Excluir')}" aria-label="${L('Delete', 'Excluir')}">✕</button>
       </li>`
     }).join('')
     $('#save-hint').textContent = L(
-      'Changes save automatically to the selected simulation. Use the draft to try things out without touching your saved ones. ★ marks your default: Reset fills the draft with it.',
-      'As alterações são salvas automaticamente na simulação selecionada. Use o rascunho para testar sem mexer nas suas simulações salvas. ★ marca o seu padrão: Restaurar preenche o rascunho com ele.')
+      'The draft saves as you type. A saved simulation only changes when you click Save on its row; ↺ discards the changes. ★ marks your default: Reset fills the draft with it.',
+      'O rascunho é salvo enquanto você digita. Uma simulação salva só muda quando você clica em Salvar na linha dela; ↺ descarta as alterações. ★ marca o seu padrão: Restaurar preenche o rascunho com ele.')
     renderSaveBtn()
     renderResetLabel()
   }
@@ -1456,7 +1470,7 @@ td.neg { color: var(--ink-2); }
   function openSim(id) {
     const item = findSave(id)
     saves.currentId = item ? item.id : null
-    state = sanitize(item ? item.inputs : saves.draft)
+    state = sanitize(item ? saves.pending[item.id] || item.inputs : saves.draft)
     persistSaves()
     renderInputs()
     recompute()
@@ -1597,6 +1611,7 @@ td.neg { color: var(--ink-2); }
     if (nameTaken(name)) return
     const item = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, inputs: { ...state }, at: Date.now() }
     saves.list.push(item)
+    if (saves.currentId) delete saves.pending[saves.currentId]
     saves.currentId = item.id
     persistSaves()
     input.value = ''
@@ -1618,6 +1633,18 @@ td.neg { color: var(--ink-2); }
     const item = findSave(row.dataset.id)
     if (!item) return
     if (act === 'load') return openSim(item.id)
+    if (act === 'save') {
+      if (saves.pending[item.id]) Object.assign(item, { inputs: saves.pending[item.id], at: Date.now() })
+      delete saves.pending[item.id]
+      persistSaves()
+      return renderSaves()
+    }
+    if (act === 'discard') {
+      delete saves.pending[item.id]
+      if (saves.currentId === item.id) return openSim(item.id)
+      persistSaves()
+      return renderSaves()
+    }
     if (act === 'default') {
       saves.defaultId = saves.defaultId === item.id ? null : item.id
       persistSaves()
@@ -1635,6 +1662,7 @@ td.neg { color: var(--ink-2); }
       armedDelete = null
       clearTimeout(armTimer)
       saves.list = saves.list.filter((x) => x.id !== item.id)
+      delete saves.pending[item.id]
       if (saves.defaultId === item.id) saves.defaultId = null
       if (saves.currentId === item.id) return openSim(null)
       persistSaves()
@@ -1670,11 +1698,15 @@ td.neg { color: var(--ink-2); }
   })
 
   // ---------- Recompute ----------
-  /** Every edit saves to the selected simulation (or the draft). */
+  /** The draft saves as you type; edits to a saved simulation wait in `pending` for its Save button. */
   function changed() {
     const cur = findSave(saves.currentId)
-    if (cur) Object.assign(cur, { inputs: { ...state }, at: Date.now() })
-    else saves.draft = { ...state }
+    if (cur) {
+      const wasDirty = !!saves.pending[cur.id]
+      if (JSON.stringify(state) === JSON.stringify(sanitize(cur.inputs))) delete saves.pending[cur.id]
+      else saves.pending[cur.id] = { ...state }
+      if (wasDirty !== !!saves.pending[cur.id]) renderSaves()
+    } else saves.draft = { ...state }
     persistSaves()
     updateVisibility()
     recompute()

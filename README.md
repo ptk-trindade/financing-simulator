@@ -19,7 +19,7 @@ The headline is the difference between the two. The page also shows:
 - a sensitivity chart and grid showing which inputs move the result most
 - warnings for things to check, such as LTV caps, MCMV limits and installments that run past the sale
 
-Your work lives in **My simulations**. The **Draft** is always at the top: a scratch pad for trying things out. Use "Save as new" to keep the current inputs under a name ("Pinheiros 2BR", "Vila Mariana 3BR"). Every edit saves automatically to whichever simulation is open. Saved simulations can be renamed or deleted, and one can be marked with ★ as your default: Reset fills the draft with it. Everything is stored in your browser's local storage, so it stays on that device and browser only.
+Your work lives in **My simulations**. The **Draft** is always at the top: a scratch pad for trying things out. Use "Save as new" to keep the current inputs under a name ("Pinheiros 2BR", "Vila Mariana 3BR"). The draft saves as you type. A saved simulation only changes when you click Save on its row; until then its edits are kept as "unsaved" (even if you switch away), and ↺ discards them. Saved simulations can be renamed or deleted, and one can be marked with ★ as your default: Reset fills the draft with it. Everything is stored in your browser's local storage, so it stays on that device and browser only.
 
 It covers the associativo and repasse structures, SBPE and MCMV credit lines, SAC and PRICE amortization, and selling either by deed or by cessão de direitos.
 
