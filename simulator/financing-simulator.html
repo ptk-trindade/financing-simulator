@@ -986,7 +986,6 @@ td.neg { color: var(--ink-2); }
   'use strict'
   const E = window.OffplanEngine
   const D = E.DEFAULTS
-  const STORE_KEY = 'financing-simulator:inputs:v1'
   const OPEN_KEY = 'financing-simulator:open:v1'
   const LANG_KEY = 'financing-simulator:lang:v1'
   const $ = (s) => document.querySelector(s)
@@ -1306,7 +1305,8 @@ td.neg { color: var(--ink-2); }
     }
     return s
   }
-  // Named saves: { list: [{ id, name, inputs, at }], defaultId, currentId }
+  // Simulations: { draft: inputs, list: [{ id, name, inputs, at }], defaultId, currentId }
+  // currentId null means the Draft is selected. Edits save automatically to whichever is selected.
   const SAVES_KEY = 'financing-simulator:saves:v1'
   const saves = (() => {
     const raw = store.get(SAVES_KEY)
@@ -1314,16 +1314,21 @@ td.neg { color: var(--ink-2); }
       ? raw.list.filter((x) => x && typeof x.id === 'string' && typeof x.name === 'string' && x.inputs && typeof x.inputs === 'object')
       : []
     const has = (id) => list.some((x) => x.id === id)
-    return { list, defaultId: has(raw && raw.defaultId) ? raw.defaultId : null, currentId: has(raw && raw.currentId) ? raw.currentId : null }
+    const defaultId = has(raw && raw.defaultId) ? raw.defaultId : null
+    const mine = list.find((x) => x.id === defaultId)
+    const draft = raw && raw.draft && typeof raw.draft === 'object' ? sanitize(raw.draft) : sanitize(mine ? mine.inputs : D)
+    return { draft, list, defaultId, currentId: has(raw && raw.currentId) ? raw.currentId : null }
   })()
   const findSave = (id) => saves.list.find((x) => x.id === id) || null
-  const findByName = (name) => saves.list.find((x) => x.name.toLowerCase() === name.trim().toLowerCase()) || null
+  const DRAFT_NAMES = ['draft', 'rascunho']
+  const nameTaken = (name) => {
+    const n = name.trim().toLowerCase()
+    return DRAFT_NAMES.includes(n) || saves.list.some((x) => x.name.toLowerCase() === n)
+  }
   const persistSaves = () => store.set(SAVES_KEY, saves)
 
-  const working = store.get(STORE_KEY)
-  const mine = findSave(saves.defaultId)
-  let state = working ? sanitize(working) : mine ? sanitize(mine.inputs) : { ...D }
-  if (!working && mine) saves.currentId = mine.id
+  const cur0 = findSave(saves.currentId)
+  let state = sanitize(cur0 ? cur0.inputs : saves.draft)
   let openState = store.get(OPEN_KEY) || {}
   let sim = null
 
@@ -1383,45 +1388,44 @@ td.neg { color: var(--ink-2); }
 
   function savesCardHtml() {
     const open = 'saves' in openState ? openState.saves : true
-    const cur = findSave(saves.currentId)
     return `<details class="group" data-sec="saves"${open ? ' open' : ''}>
       <summary><span>${L('My simulations', 'Minhas simulações')}</span><span class="sum-note" id="sn-saves"></span></summary>
       <div class="fields">
+        <ul class="save-list" id="save-list"></ul>
         <form class="save-form" id="save-form" autocomplete="off">
-          <span class="inbox"><input id="save-name" class="text" maxlength="60" aria-label="${L('Name for this simulation', 'Nome desta simulação')}" placeholder="${L('Name, e.g. Pinheiros 2BR', 'Nome, ex.: Pinheiros 2 dorms')}" value="${cur ? esc(cur.name) : ''}"></span>
+          <span class="inbox"><input id="save-name" class="text" maxlength="60" aria-label="${L('Name for a new simulation', 'Nome da nova simulação')}" placeholder="${L('New name, e.g. Pinheiros 2BR', 'Novo nome, ex.: Pinheiros 2 dorms')}"></span>
           <button type="submit" class="btn primary" id="save-btn"></button>
         </form>
-        <ul class="save-list" id="save-list"></ul>
         <span class="hint" id="save-hint"></span>
-        <div><button type="button" class="linkbtn" id="load-standard">${L('Load the standard example values', 'Carregar os valores padrão de exemplo')}</button></div>
       </div>
     </details>`
   }
 
+  const draftName = () => L('Draft', 'Rascunho')
+
   function renderSaves() {
     const cur = findSave(saves.currentId)
-    const edited = !!cur && JSON.stringify(sanitize(cur.inputs)) !== JSON.stringify(state)
     const sn = $('#sn-saves')
-    if (sn) sn.textContent = cur ? cur.name + (edited ? ' · ' + L('edited', 'alterado') : '') : L('not saved', 'não salvo')
+    if (sn) sn.textContent = cur ? cur.name : draftName()
     const list = $('#save-list')
     if (!list) return
-    list.hidden = !saves.list.length
-    list.innerHTML = saves.list.map((x) => {
+    const draftRow = `<li class="save-row draft${cur ? '' : ' current'}" data-draft>
+        <button type="button" class="name" data-act="load" title="${L('Open', 'Abrir')}"><span>${draftName()}</span><span class="tag">${L('scratch pad', 'para testar à vontade')}</span></button>
+        <button type="button" class="icon-btn" data-act="reset-draft" title="${L('Fill with my default', 'Preencher com meu padrão')}">${L('Reset', 'Restaurar')}</button>
+      </li>`
+    list.innerHTML = draftRow + saves.list.map((x) => {
       const isCur = x.id === saves.currentId
       const isDef = x.id === saves.defaultId
-      const tags = [isDef ? L('default', 'padrão') : '', isCur && edited ? L('edited', 'alterado') : ''].filter(Boolean).join(' · ')
       return `<li class="save-row${isCur ? ' current' : ''}" data-id="${x.id}">
-        <button type="button" class="name" data-act="load" title="${L('Load', 'Carregar')}"><span>${esc(x.name)}</span>${tags ? `<span class="tag">${tags}</span>` : ''}</button>
+        <button type="button" class="name" data-act="load" title="${L('Open', 'Abrir')}"><span>${esc(x.name)}</span>${isDef ? `<span class="tag">${L('default', 'padrão')}</span>` : ''}</button>
         <button type="button" class="icon-btn${isDef ? ' on' : ''}" data-act="default" aria-pressed="${isDef}" title="${L('Use as my default', 'Usar como meu padrão')}" aria-label="${L('Use as my default', 'Usar como meu padrão')}">${isDef ? '★' : '☆'}</button>
         <button type="button" class="icon-btn" data-act="rename" title="${L('Rename', 'Renomear')}" aria-label="${L('Rename', 'Renomear')}">✎</button>
         <button type="button" class="icon-btn" data-act="delete" title="${L('Delete', 'Excluir')}" aria-label="${L('Delete', 'Excluir')}">✕</button>
       </li>`
     }).join('')
-    $('#save-hint').textContent = saves.list.length
-      ? L('Click a name to load it. ★ marks your default, which Reset goes back to. Saving under an existing name updates it.',
-          'Clique num nome para carregar. ★ marca o seu padrão, para onde o botão Restaurar volta. Salvar com um nome que já existe atualiza a simulação.')
-      : L('Name your inputs to save them and come back later. Saves stay in this browser on this device.',
-          'Dê um nome aos seus dados para salvá-los e voltar depois. As simulações ficam salvas neste navegador, neste aparelho.')
+    $('#save-hint').textContent = L(
+      'Changes save automatically to the selected simulation. Use the draft to try things out without touching your saved ones. ★ marks your default: Reset fills the draft with it.',
+      'As alterações são salvas automaticamente na simulação selecionada. Use o rascunho para testar sem mexer nas suas simulações salvas. ★ marca o seu padrão: Restaurar preenche o rascunho com ele.')
     renderSaveBtn()
     renderResetLabel()
   }
@@ -1431,8 +1435,9 @@ td.neg { color: var(--ink-2); }
     const btn = $('#save-btn')
     if (!input || !btn) return
     const name = input.value.trim()
-    btn.disabled = !name
-    btn.textContent = name && findByName(name) ? L('Update', 'Atualizar') : L('Save', 'Salvar')
+    const taken = !!name && nameTaken(name)
+    btn.disabled = !name || taken
+    btn.textContent = taken ? L('Name in use', 'Nome já existe') : L('Save as new', 'Salvar como nova')
   }
 
   function renderInputs() {
@@ -1444,13 +1449,24 @@ td.neg { color: var(--ink-2); }
     renderSaves()
   }
 
-  /** Replace all inputs at once (loading a save, reset, a test case). */
-  function loadState(inputs, saveId) {
-    state = sanitize(inputs)
-    saves.currentId = saveId || null
+  /** Switch to a saved simulation, or to the draft when id is null. */
+  function openSim(id) {
+    const item = findSave(id)
+    saves.currentId = item ? item.id : null
+    state = sanitize(item ? item.inputs : saves.draft)
     persistSaves()
     renderInputs()
-    changed()
+    recompute()
+  }
+
+  /** Overwrite the draft with these inputs and switch to it (Reset, test cases). */
+  function fillDraft(inputs) {
+    saves.draft = sanitize(inputs)
+    openSim(null)
+  }
+  const myDefaultInputs = () => {
+    const mine = findSave(saves.defaultId)
+    return mine ? mine.inputs : D
   }
 
   function display(v, f) {
@@ -1562,9 +1578,7 @@ td.neg { color: var(--ink-2); }
   }, true)
 
   $('#reset').addEventListener('click', () => {
-    const mineNow = findSave(saves.defaultId)
-    if (mineNow) loadState(mineNow.inputs, mineNow.id)
-    else loadState(D, null)
+    fillDraft(myDefaultInputs())
   })
 
   // ---------- Saved simulations ----------
@@ -1577,32 +1591,30 @@ td.neg { color: var(--ink-2); }
     const input = $('#save-name')
     const name = input.value.trim().slice(0, 60)
     if (!name) return
-    let item = findByName(name)
-    if (item) Object.assign(item, { name, inputs: { ...state }, at: Date.now() })
-    else {
-      item = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, inputs: { ...state }, at: Date.now() }
-      saves.list.push(item)
-    }
+    if (nameTaken(name)) return
+    const item = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, inputs: { ...state }, at: Date.now() }
+    saves.list.push(item)
     saves.currentId = item.id
     persistSaves()
-    input.value = name
+    input.value = ''
     renderSaves()
-    const btn = $('#save-btn')
-    btn.textContent = L('Saved ✓', 'Salvo ✓')
-    setTimeout(renderSaveBtn, 1400)
   })
 
   let armedDelete = null
   let armTimer = null
   inputsEl.addEventListener('click', (e) => {
-    if (e.target.id === 'load-standard') return loadState(D, null)
     const b = e.target.closest('[data-act]')
     if (!b) return
-    const row = b.closest('[data-id]')
+    const row = b.closest('.save-row')
+    const act = b.dataset.act
+    if (row.hasAttribute('data-draft')) {
+      if (act === 'load') return openSim(null)
+      if (act === 'reset-draft') return fillDraft(myDefaultInputs())
+      return
+    }
     const item = findSave(row.dataset.id)
     if (!item) return
-    const act = b.dataset.act
-    if (act === 'load') return loadState(item.inputs, item.id)
+    if (act === 'load') return openSim(item.id)
     if (act === 'default') {
       saves.defaultId = saves.defaultId === item.id ? null : item.id
       persistSaves()
@@ -1621,10 +1633,7 @@ td.neg { color: var(--ink-2); }
       clearTimeout(armTimer)
       saves.list = saves.list.filter((x) => x.id !== item.id)
       if (saves.defaultId === item.id) saves.defaultId = null
-      if (saves.currentId === item.id) {
-        saves.currentId = null
-        $('#save-name').value = ''
-      }
+      if (saves.currentId === item.id) return openSim(null)
       persistSaves()
       return renderSaves()
     }
@@ -1643,11 +1652,9 @@ td.neg { color: var(--ink-2); }
         if (done) return
         done = true
         const name = field.value.trim().slice(0, 60)
-        const clash = findByName(name)
-        if (commit && name && (!clash || clash === item)) {
+        if (commit && name && (name.toLowerCase() === item.name.toLowerCase() || !nameTaken(name))) {
           item.name = name
           persistSaves()
-          if (saves.currentId === item.id) $('#save-name').value = name
         }
         renderSaves()
       }
@@ -1660,10 +1667,13 @@ td.neg { color: var(--ink-2); }
   })
 
   // ---------- Recompute ----------
+  /** Every edit saves to the selected simulation (or the draft). */
   function changed() {
-    store.set(STORE_KEY, state)
+    const cur = findSave(saves.currentId)
+    if (cur) Object.assign(cur, { inputs: { ...state }, at: Date.now() })
+    else saves.draft = { ...state }
+    persistSaves()
     updateVisibility()
-    renderSaves()
     recompute()
   }
 
@@ -2081,7 +2091,7 @@ td.neg { color: var(--ink-2); }
   $('#tests').addEventListener('click', (e) => {
     const b = e.target.closest('[data-load-test]')
     if (!b) return
-    loadState(E.TESTS[+b.dataset.loadTest].inputs, null)
+    fillDraft(E.TESTS[+b.dataset.loadTest].inputs)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   })
 
